@@ -2,23 +2,23 @@
 
 ## Introduction
 
-A feature MF09 - Keyword Screening implementa uma regra de screening responsável por analisar a descrição de transações PIX e identificar a presença de palavras ou expressões restritas previamente cadastradas pela área de Compliance. O objetivo é detectar possíveis indícios de terrorismo, lavagem de dinheiro (AML), fraude, crime financeiro, sanções e outras categorias definidas pelo negócio.
+O **Keyword Screening** implementa uma regra de screening responsável por analisar a descrição de transações PIX e identificar a presença de palavras ou expressões restritas previamente cadastradas pela área de Compliance. O objetivo é detectar possíveis indícios de terrorismo, lavagem de dinheiro (AML), fraude, crime financeiro, sanções e outras categorias definidas pelo negócio.
 
 A solução utiliza um cache em memória dos termos restritos para garantir alta performance (< 10ms), suporta idempotência por transação e opera de forma resiliente mesmo quando o banco de dados estiver indisponível após a carga inicial.
 
 ## Glossary
 
-- **MF09_Service**: Serviço principal responsável por orquestrar a execução da regra MF09.
+- **KeywordScreeningService**: Serviço principal responsável por orquestrar a execução da regra de Keyword Screening.
 - **TextNormalizer**: Componente de domínio responsável pela normalização de texto (minúsculas, remoção de acentos, remoção de caracteres especiais, compactação de espaços).
 - **KeywordMatcher**: Componente de domínio responsável por identificar termos restritos na descrição normalizada.
 - **IdempotencyService**: Serviço responsável por verificar e garantir que uma transação não seja processada mais de uma vez pela mesma regra.
 - **RestrictedTermsCache**: Componente responsável por manter os termos restritos ativos em memória.
 - **RestrictedTermsScheduler**: Componente responsável por recarregar periodicamente os termos restritos do banco de dados para o cache.
-- **RuleExecution**: Aggregate root que representa uma execução persistida da regra MF09 para uma transação específica.
+- **RuleExecution**: Aggregate root que representa uma execução persistida da regra de Keyword Screening para uma transação específica.
 - **RestrictedTerm**: Entidade que representa um termo restrito cadastrado pela área de Compliance, contendo o termo normalizado e sua categoria.
 - **MatchResult**: Value object que representa um termo restrito identificado durante a análise de uma descrição.
-- **ScreeningResult**: Value object que representa o resultado consolidado da execução da regra MF09.
-- **Idempotency_Key**: Chave composta no formato `MF09:{transactionId}` utilizada para identificar unicamente uma execução da regra por transação.
+- **ScreeningResult**: Value object que representa o resultado consolidado da execução da regra.
+- **Idempotency_Key**: Chave composta no formato `KEYWORD_SCREENING:{transactionId}` utilizada para identificar unicamente uma execução da regra por transação.
 - **Normalized_Description**: Descrição da transação após aplicação das regras de normalização (minúsculas, sem acentos, sem caracteres especiais, espaços compactados).
 - **Category**: Classificação de risco associada a um termo restrito (ex: TERRORISM, AML, FRAUD, FINANCIAL_CRIME, SANCTIONS).
 
@@ -32,10 +32,10 @@ A solução utiliza um cache em memória dos termos restritos para garantir alta
 
 #### Acceptance Criteria
 
-1. WHEN uma requisição de avaliação é recebida com `transactionId` e `description` válidos, THE MF09_Service SHALL normalizar a descrição e verificar a presença de termos restritos ativos no cache.
-2. WHEN pelo menos um termo restrito ativo é encontrado na Normalized_Description, THE MF09_Service SHALL retornar uma resposta com `matched=true` e a lista de todos os MatchResults identificados, incluindo todos os termos encontrados independentemente da quantidade.
-3. WHEN nenhum termo restrito ativo é encontrado na Normalized_Description, THE MF09_Service SHALL retornar uma resposta com `matched=false` e lista de matches vazia.
-4. WHEN o campo `ruleCode` pode ser determinado, THE MF09_Service SHALL incluir o campo `ruleCode` com valor `"MF09"` na resposta de avaliação; IF o campo `ruleCode` não puder ser incluído, THEN THE MF09_Service SHALL retornar a resposta parcial sem o campo `ruleCode`.
+1. WHEN uma requisição de avaliação é recebida com `transactionId` e `description` válidos, THE KeywordScreeningService SHALL normalizar a descrição e verificar a presença de termos restritos ativos no cache.
+2. WHEN pelo menos um termo restrito ativo é encontrado na Normalized_Description, THE KeywordScreeningService SHALL retornar uma resposta com `matched=true` e a lista de todos os MatchResults identificados, incluindo todos os termos encontrados independentemente da quantidade.
+3. WHEN nenhum termo restrito ativo é encontrado na Normalized_Description, THE KeywordScreeningService SHALL retornar uma resposta com `matched=false` e lista de matches vazia.
+4. WHEN o campo `ruleCode` pode ser determinado, THE KeywordScreeningService SHALL incluir o campo `ruleCode` com valor `"KEYWORD_SCREENING"` na resposta de avaliação; IF o campo `ruleCode` não puder ser incluído, THEN THE KeywordScreeningService SHALL retornar a resposta parcial sem o campo `ruleCode`.
 
 ---
 
@@ -63,7 +63,7 @@ A solução utiliza um cache em memória dos termos restritos para garantir alta
 1. WHEN a busca por termos restritos é executada, THE KeywordMatcher SHALL consultar exclusivamente o RestrictedTermsCache, sem realizar consultas ao banco de dados durante a avaliação, independentemente do tempo de resposta.
 2. WHEN a busca é realizada, THE KeywordMatcher SHALL comparar a Normalized_Description com os termos normalizados armazenados no cache.
 3. WHEN um termo restrito normalizado está contido na Normalized_Description, THE KeywordMatcher SHALL incluir o termo e sua Category no resultado.
-4. WHILE o RestrictedTermsCache está carregado, THE MF09_Service SHALL processar requisições de avaliação em tempo médio inferior a 10ms para descrições de até 140 caracteres.
+4. WHILE o RestrictedTermsCache está carregado, THE KeywordScreeningService SHALL processar requisições de avaliação em tempo médio inferior a 10ms para descrições de até 140 caracteres.
 5. WHEN termos inativos (`active=false`) são encontrados no cache, THE KeywordMatcher SHALL ignorá-los silenciosamente e continuar o processamento considerando apenas os termos ativos.
 
 ---
@@ -85,14 +85,14 @@ A solução utiliza um cache em memória dos termos restritos para garantir alta
 
 ### Requirement 5: Idempotência de Execução
 
-**User Story:** Como analista de Compliance, quero que a mesma transação não seja processada mais de uma vez pela regra MF09, para que os resultados sejam consistentes e o processamento duplicado seja evitado.
+**User Story:** Como analista de Compliance, quero que a mesma transação não seja processada mais de uma vez pela regra de Keyword Screening, para que os resultados sejam consistentes e o processamento duplicado seja evitado.
 
 #### Acceptance Criteria
 
-1. WHEN uma requisição de avaliação é recebida, THE IdempotencyService SHALL verificar a existência de um RuleExecution com a Idempotency_Key `MF09:{transactionId}` antes de executar a regra.
+1. WHEN uma requisição de avaliação é recebida, THE IdempotencyService SHALL verificar a existência de um RuleExecution com a Idempotency_Key `KEYWORD_SCREENING:{transactionId}` antes de executar a regra.
 2. WHEN um RuleExecution existente é encontrado para a Idempotency_Key, THE IdempotencyService SHALL retornar o resultado previamente persistido sem executar a regra novamente, independentemente do tempo decorrido desde a primeira execução.
-3. WHEN nenhum RuleExecution existente é encontrado para a Idempotency_Key, THE MF09_Service SHALL executar a regra, persistir o RuleExecution com o resultado e retornar a resposta.
-4. WHEN o resultado de uma avaliação é persistido, THE MF09_Service SHALL armazenar o ScreeningResult completo associado à Idempotency_Key no banco de dados.
+3. WHEN nenhum RuleExecution existente é encontrado para a Idempotency_Key, THE KeywordScreeningService SHALL executar a regra, persistir o RuleExecution com o resultado e retornar a resposta.
+4. WHEN o resultado de uma avaliação é persistido, THE KeywordScreeningService SHALL armazenar o ScreeningResult completo associado à Idempotency_Key no banco de dados.
 5. WHEN duas requisições concorrentes chegam com o mesmo `transactionId` e uma condição de corrida ocorre, THE IdempotencyService SHALL permitir que ambas as execuções prossigam e SHALL aplicar lógica de limpeza para tratar duplicatas resultantes.
 6. THE RuleExecution SHALL ser identificado unicamente pela combinação de `transaction_id` e `rule_code` no banco de dados.
 
@@ -100,12 +100,12 @@ A solução utiliza um cache em memória dos termos restritos para garantir alta
 
 ### Requirement 6: API de Avaliação
 
-**User Story:** Como sistema consumidor, quero uma API REST para submeter transações PIX para avaliação da regra MF09, para que o resultado do screening seja obtido de forma síncrona.
+**User Story:** Como sistema consumidor, quero uma API REST para submeter transações PIX para avaliação da regra de Keyword Screening, para que o resultado do screening seja obtido de forma síncrona.
 
 #### Acceptance Criteria
 
-1. THE MF09_Service SHALL expor o endpoint `POST /v1/rules/mf09/evaluate` para recebimento de requisições de avaliação.
-2. WHEN uma requisição válida é recebida no endpoint, THE MF09_Service SHALL retornar uma resposta HTTP 200 com o ScreeningResult no corpo.
-3. WHEN o campo `transactionId` está ausente, vazio ou contém apenas espaços em branco na requisição, THE MF09_Service SHALL retornar HTTP 400 com mensagem de erro descritiva.
-4. WHEN o campo `description` está ausente ou contém uma string vazia na requisição, THE MF09_Service SHALL retornar HTTP 400 com mensagem de erro descritiva.
-5. THE MF09_Service SHALL aceitar requisições com `description` de até 140 caracteres para garantia do SLA de performance.
+1. THE KeywordScreeningService SHALL expor o endpoint `POST /v1/rules/keyword-screening/evaluate` para recebimento de requisições de avaliação.
+2. WHEN uma requisição válida é recebida no endpoint, THE KeywordScreeningService SHALL retornar uma resposta HTTP 200 com o ScreeningResult no corpo.
+3. WHEN o campo `transactionId` está ausente, vazio ou contém apenas espaços em branco na requisição, THE KeywordScreeningService SHALL retornar HTTP 400 com mensagem de erro descritiva.
+4. WHEN o campo `description` está ausente ou contém uma string vazia na requisição, THE KeywordScreeningService SHALL retornar HTTP 400 com mensagem de erro descritiva.
+5. THE KeywordScreeningService SHALL aceitar requisições com `description` de até 140 caracteres para garantia do SLA de performance.

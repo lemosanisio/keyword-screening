@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyword Screening — Spec Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-subtle: #1f6feb;
+            --success: #3fb950;
+            --warning: #d29922;
+            --code-bg: #1c2128;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--accent); }
+        h2 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+        h3 { font-size: 1.25rem; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--accent); }
+        h4 { font-size: 1rem; margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-muted); }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+        li { margin-bottom: 0.25rem; }
+        code {
+            background: var(--code-bg);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border);
+        }
+        pre code { background: none; padding: 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.6rem 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th { background: var(--surface); color: var(--accent); font-weight: 600; }
+        td { background: var(--bg); }
+        .mermaid {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        .tab-container { margin-top: 1rem; }
+        .tab-buttons { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.95rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .tab-content { display: none; padding-top: 1.5rem; }
+        .tab-content.active { display: block; }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-done { background: #1a4023; color: var(--success); }
+        .badge-property { background: #1c2541; color: #79c0ff; }
+        .req-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .req-card h4 { margin-top: 0; color: var(--text); }
+        .user-story { font-style: italic; color: var(--text-muted); margin-bottom: 0.75rem; }
+        .glossary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.75rem; }
+        .glossary-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; }
+        .glossary-item strong { color: var(--accent); }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .nav { position: sticky; top: 0; background: var(--bg); padding: 1rem 0; border-bottom: 1px solid var(--border); z-index: 10; margin-bottom: 2rem; }
+        .nav a { margin-right: 1.5rem; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="nav">
+    <a href="#requirements">Requisitos</a>
+    <a href="#design">Design</a>
+    <a href="#tasks">Tarefas</a>
+    <a href="#properties">Propriedades PBT</a>
+</div>
+
+<h1>🔍 Keyword Screening — Spec</h1>
+<p>Sistema de screening de transações PIX que identifica termos restritos em descrições, detectando possíveis indícios de terrorismo, lavagem de dinheiro, fraude, crime financeiro e sanções.</p>
+
+<div class="tab-container">
+    <div class="tab-buttons">
+        <button class="tab-btn active" onclick="showTab('requirements')">Requisitos</button>
+        <button class="tab-btn" onclick="showTab('design')">Design</button>
+        <button class="tab-btn" onclick="showTab('tasks')">Tarefas</button>
+    </div>
+
+    <!-- REQUIREMENTS TAB -->
+    <div id="requirements" class="tab-content active">
+        <h2>Introdução</h2>
+        <p>O <strong>Keyword Screening</strong> implementa uma regra de screening responsável por analisar a descrição de transações PIX e identificar a presença de palavras ou expressões restritas previamente cadastradas pela área de Compliance.</p>
+        <p>A solução utiliza um cache em memória dos termos restritos para garantir alta performance (&lt; 10ms), suporta idempotência por transação e opera de forma resiliente mesmo quando o banco de dados estiver indisponível após a carga inicial.</p>
+
+        <h2>Glossário</h2>
+        <div class="glossary-grid">
+            <div class="glossary-item"><strong>KeywordScreeningService</strong> — Serviço principal que orquestra a execução da regra</div>
+            <div class="glossary-item"><strong>TextNormalizer</strong> — Normalização de texto (minúsculas, acentos, especiais, espaços)</div>
+            <div class="glossary-item"><strong>KeywordMatcher</strong> — Identifica termos restritos na descrição normalizada</div>
+            <div class="glossary-item"><strong>IdempotencyService</strong> — Garante processamento único por transação</div>
+            <div class="glossary-item"><strong>RestrictedTermsCache</strong> — Mantém termos ativos em memória</div>
+            <div class="glossary-item"><strong>RestrictedTermsScheduler</strong> — Recarrega termos periodicamente (5 min)</div>
+            <div class="glossary-item"><strong>RuleExecution</strong> — Aggregate root: execução persistida da regra</div>
+            <div class="glossary-item"><strong>Idempotency_Key</strong> — <code>KEYWORD_SCREENING:{transactionId}</code></div>
+        </div>
+
+        <h2 id="requirements">Requisitos</h2>
+
+        <div class="req-card">
+            <h4>Requirement 1: Avaliação de Descrição PIX por Termos Restritos</h4>
+            <p class="user-story">Como analista de Compliance, quero que o sistema analise automaticamente a descrição de transações PIX em busca de termos restritos, para que possíveis indícios de atividades ilícitas sejam detectados em tempo real.</p>
+            <ol>
+                <li>WHEN requisição recebida com <code>transactionId</code> e <code>description</code> válidos → normalizar e verificar termos no cache</li>
+                <li>WHEN pelo menos um termo encontrado → <code>matched=true</code> + lista de MatchResults</li>
+                <li>WHEN nenhum termo encontrado → <code>matched=false</code> + matches vazia</li>
+                <li>SHALL incluir <code>ruleCode="KEYWORD_SCREENING"</code> na resposta</li>
+            </ol>
+        </div>
+
+        <div class="req-card">
+            <h4>Requirement 2: Normalização de Texto</h4>
+            <p class="user-story">Como desenvolvedor, quero que a descrição seja normalizada antes da análise, para que diferenças de formatação não impeçam a detecção.</p>
+            <ol>
+                <li>Converter para minúsculas</li>
+                <li>Remover acentos → caracteres base</li>
+                <li>Remover caracteres especiais (pontuação, símbolos)</li>
+                <li>Compactar múltiplos espaços em um</li>
+                <li>Pipeline sequencial: lowercase → acentos → especiais → espaços</li>
+                <li>Propriedade de round-trip: resultado independe de variações de entrada</li>
+            </ol>
+        </div>
+
+        <div class="req-card">
+            <h4>Requirement 3: Busca de Termos Restritos no Cache</h4>
+            <p class="user-story">Como analista de Compliance, quero que a busca seja feita exclusivamente em memória, para tempo de resposta &lt; 10ms.</p>
+            <ol>
+                <li>Consultar exclusivamente o RestrictedTermsCache (sem DB durante avaliação)</li>
+                <li>Comparar descrição normalizada com termos normalizados no cache</li>
+                <li>Incluir termo e Category no resultado quando encontrado</li>
+                <li>Tempo médio &lt; 10ms para descrições até 140 caracteres</li>
+                <li>Ignorar termos inativos (<code>active=false</code>)</li>
+            </ol>
+        </div>
+
+        <div class="req-card">
+            <h4>Requirement 4: Gerenciamento do Cache</h4>
+            <p class="user-story">Como operador, quero que os termos sejam mantidos em memória e atualizados periodicamente.</p>
+            <ol>
+                <li>Carregar termos <code>active=true</code> no startup (fail-fast se banco indisponível)</li>
+                <li>Manter em memória para consulta pelo KeywordMatcher</li>
+                <li>Recarregar a cada 5 minutos via <code>@Scheduled</code></li>
+                <li>Continuar servindo termos anteriores se banco ficar indisponível</li>
+                <li>Se reload falhar → manter cache + logar erro</li>
+                <li>Armazenar termos já normalizados no cache</li>
+            </ol>
+        </div>
+
+        <div class="req-card">
+            <h4>Requirement 5: Idempotência de Execução</h4>
+            <p class="user-story">Como analista, quero que a mesma transação não seja processada mais de uma vez.</p>
+            <ol>
+                <li>Verificar existência de RuleExecution com <code>KEYWORD_SCREENING:{transactionId}</code></li>
+                <li>Se existir → retornar resultado salvo sem re-executar</li>
+                <li>Se não existir → executar, persistir e retornar</li>
+                <li>Armazenar ScreeningResult completo no banco</li>
+                <li>Race condition → permitir execução + limpeza via constraint UNIQUE</li>
+                <li>UNIQUE(transaction_id, rule_code)</li>
+            </ol>
+        </div>
+
+        <div class="req-card">
+            <h4>Requirement 6: API de Avaliação</h4>
+            <p class="user-story">Como sistema consumidor, quero uma API REST para submeter transações para screening síncrono.</p>
+            <ol>
+                <li>Endpoint: <code>POST /v1/rules/keyword-screening/evaluate</code></li>
+                <li>Requisição válida → HTTP 200 com ScreeningResult</li>
+                <li><code>transactionId</code> ausente/vazio/branco → HTTP 400</li>
+                <li><code>description</code> ausente/vazia → HTTP 400</li>
+                <li>Aceitar <code>description</code> até 140 caracteres</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- DESIGN TAB -->
+    <div id="design" class="tab-content">
+        <h2>Decisões de Design</h2>
+        <table>
+            <thead><tr><th>Decisão</th><th>Escolha</th><th>Justificativa</th></tr></thead>
+            <tbody>
+                <tr><td>Cache em memória</td><td><code>Set&lt;RestrictedTerm&gt;</code> com <code>@Volatile</code></td><td>Leitura O(n), sem infra externa, resiliência a falhas</td></tr>
+                <tr><td>Idempotência</td><td>UNIQUE constraint + verificação prévia</td><td>Consistência sem lock distribuído</td></tr>
+                <tr><td>Normalização</td><td>Pipeline sequencial imutável</td><td>Determinismo e testabilidade</td></tr>
+                <tr><td>Extensibilidade</td><td>Interface <code>ScreeningRule</code></td><td>Novas regras sem alterar o núcleo</td></tr>
+                <tr><td>Persistência</td><td>JSONB no PostgreSQL</td><td>Flexibilidade para evoluir schema</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Diagrama de Contexto</h2>
+        <div class="mermaid">
+C4Context
+    title Keyword Screening — Contexto
+    Person(compliance, "Analista de Compliance", "Cadastra termos restritos")
+    System(keywordScreening, "Keyword Screening", "Avalia descrições PIX contra termos restritos")
+    SystemDb(postgres, "PostgreSQL", "Persiste termos restritos e execuções de regras")
+    System_Ext(consumer, "Sistema Consumidor", "Submete transações PIX para avaliação")
+    Rel(consumer, keywordScreening, "POST /v1/rules/keyword-screening/evaluate", "JSON/HTTPS")
+    Rel(keywordScreening, postgres, "Lê termos restritos / Persiste execuções", "JDBC")
+    Rel(compliance, postgres, "Cadastra/desativa termos restritos", "SQL/Admin")
+        </div>
+
+        <h2>Diagrama de Camadas (DDD)</h2>
+        <div class="mermaid">
+graph TD
+    subgraph Presentation
+        CTRL[KeywordScreeningController]
+        REQ[EvaluateKeywordScreeningRequest]
+        RESP[EvaluateKeywordScreeningResponse]
+    end
+    subgraph Application
+        UC[EvaluateKeywordScreeningUseCase]
+        SVC[KeywordScreeningService]
+        IDEM[IdempotencyService]
+        CACHE[RestrictedTermsCache]
+    end
+    subgraph Domain
+        NORM[TextNormalizer]
+        MATCH[KeywordMatcher]
+        RT[RestrictedTerm]
+        RE[RuleExecution]
+        SR[ScreeningResult]
+    end
+    subgraph Infrastructure
+        SCHED[RestrictedTermsReloadScheduler]
+        ENTITY[JPA Entities]
+        REPO_IMPL[Repository Implementations]
+    end
+    CTRL --> UC
+    UC --> SVC
+    SVC --> IDEM
+    SVC --> CACHE
+    SVC --> NORM
+    SVC --> MATCH
+    IDEM --> RE
+    CACHE --> RT
+    SCHED --> CACHE
+        </div>
+
+        <h2>Fluxo de Processamento</h2>
+        <div class="mermaid">
+sequenceDiagram
+    participant C as Consumer
+    participant CTRL as Controller
+    participant SVC as KeywordScreeningService
+    participant IDEM as IdempotencyService
+    participant NORM as TextNormalizer
+    participant CACHE as RestrictedTermsCache
+    participant MATCH as KeywordMatcher
+    participant DB as PostgreSQL
+
+    C->>CTRL: POST /evaluate {transactionId, description}
+    CTRL->>SVC: execute(command)
+    SVC->>IDEM: findExisting(transactionId, ruleCode)
+    IDEM->>DB: SELECT rule_execution
+    alt Execução existente
+        DB-->>IDEM: RuleExecution
+        IDEM-->>SVC: result (cached)
+        SVC-->>CTRL: result
+        CTRL-->>C: HTTP 200
+    else Nova execução
+        DB-->>IDEM: null
+        SVC->>NORM: normalize(description)
+        NORM-->>SVC: normalizedDescription
+        SVC->>CACHE: getActiveTerms()
+        CACHE-->>SVC: Set of RestrictedTerm
+        SVC->>MATCH: findMatches(desc, terms)
+        MATCH-->>SVC: List of MatchResult
+        SVC->>DB: INSERT rule_execution
+        SVC-->>CTRL: result
+        CTRL-->>C: HTTP 200
+    end
+        </div>
+
+        <h2>Ciclo de Vida do Cache</h2>
+        <div class="mermaid">
+stateDiagram-v2
+    [*] --> Uninitialized
+    Uninitialized --> Loading : ApplicationStartedEvent
+    Loading --> Ready : Carga bem-sucedida
+    Loading --> Error : Banco indisponível no startup
+    Error --> [*] : Falha crítica
+    Ready --> Reloading : @Scheduled (5 min)
+    Reloading --> Ready : Reload OK
+    Reloading --> Ready : Banco indisponível (mantém cache)
+        </div>
+
+        <h2>Diagrama ER</h2>
+        <div class="mermaid">
+erDiagram
+    RESTRICTED_TERM {
+        bigserial id PK
+        varchar term
+        varchar category
+        boolean active
+        timestamp created_at
+        timestamp updated_at
+    }
+    RULE_EXECUTION {
+        bigserial id PK
+        varchar transaction_id
+        varchar rule_code
+        jsonb result
+        timestamp created_at
+    }
+    RULE_EXECUTION ||--o{ RESTRICTED_TERM : "references via JSONB"
+        </div>
+
+        <h2>Modelo de Dados</h2>
+        <pre><code class="language-sql">CREATE TABLE restricted_term (
+    id         BIGSERIAL    PRIMARY KEY,
+    term       VARCHAR(255) NOT NULL,
+    category   VARCHAR(50)  NOT NULL,
+    active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP    NOT NULL,
+    updated_at TIMESTAMP    NOT NULL
+);
+CREATE INDEX idx_restricted_term_active ON restricted_term(active);
+
+CREATE TABLE rule_execution (
+    id             BIGSERIAL    PRIMARY KEY,
+    transaction_id VARCHAR(100) NOT NULL,
+    rule_code      VARCHAR(20)  NOT NULL,
+    result         JSONB        NOT NULL,
+    created_at     TIMESTAMP    NOT NULL,
+    CONSTRAINT uk_rule_execution UNIQUE(transaction_id, rule_code)
+);
+CREATE INDEX idx_rule_execution_lookup ON rule_execution(transaction_id, rule_code);</code></pre>
+
+        <h2>Error Handling</h2>
+        <table>
+            <thead><tr><th>Cenário</th><th>Comportamento</th><th>HTTP</th></tr></thead>
+            <tbody>
+                <tr><td><code>transactionId</code> ausente/vazio/branco</td><td>Erro de validação</td><td>400</td></tr>
+                <tr><td><code>description</code> ausente/vazia</td><td>Erro de validação</td><td>400</td></tr>
+                <tr><td><code>description</code> > 140 chars</td><td>Erro de validação</td><td>400</td></tr>
+                <tr><td>Banco indisponível no startup</td><td>Falha crítica — app não sobe</td><td>N/A</td></tr>
+                <tr><td>Banco indisponível no reload</td><td>Mantém cache + log erro</td><td>N/A</td></tr>
+                <tr><td>Race condition (UNIQUE violation)</td><td>Recupera resultado existente</td><td>200</td></tr>
+                <tr><td>Erro inesperado</td><td>Erro genérico</td><td>500</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TASKS TAB -->
+    <div id="tasks" class="tab-content">
+        <h2>Plano de Implementação</h2>
+        <p>13 grupos de tarefas, executados em waves paralelas. Todas as 61 tarefas concluídas. <span class="badge badge-done">✓ COMPLETE</span></p>
+
+        <h3>1. Estrutura do Projeto</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> build.gradle.kts com todas as dependências</li>
+            <li><span class="badge badge-done">✓</span> Kotest Config (1000 iterações)</li>
+            <li><span class="badge badge-done">✓</span> application.yml (datasource, JPA, Flyway, scheduling)</li>
+        </ul>
+
+        <h3>2. Domínio — Modelos e Interfaces</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> Category enum + MatchResult + ScreeningResult</li>
+            <li><span class="badge badge-done">✓</span> RestrictedTerm + RuleExecution</li>
+            <li><span class="badge badge-done">✓</span> Repository interfaces</li>
+            <li><span class="badge badge-done">✓</span> ScreeningRule interface</li>
+        </ul>
+
+        <h3>3. Domínio — Serviços</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> TextNormalizer + testes + <span class="badge badge-property">P1</span> <span class="badge badge-property">P2</span></li>
+            <li><span class="badge badge-done">✓</span> KeywordMatcher + testes + <span class="badge badge-property">P3</span> <span class="badge badge-property">P4</span> <span class="badge badge-property">P5</span></li>
+        </ul>
+
+        <h3>4. Migrations Flyway</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> V1: restricted_term</li>
+            <li><span class="badge badge-done">✓</span> V2: rule_execution</li>
+            <li><span class="badge badge-done">✓</span> V3: seed (10 termos)</li>
+        </ul>
+
+        <h3>5. JPA Entities e Mappers</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> RestrictedTermEntity + RuleExecutionEntity</li>
+            <li><span class="badge badge-done">✓</span> Mappers + <span class="badge badge-property">P8</span> round-trip</li>
+        </ul>
+
+        <h3>6. Repository Implementations</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> RestrictedTermRepositoryImpl</li>
+            <li><span class="badge badge-done">✓</span> RuleExecutionRepositoryImpl (com race condition handling)</li>
+        </ul>
+
+        <h3>8. Cache e Scheduler</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> RestrictedTermsCache + testes + <span class="badge badge-property">P6</span></li>
+            <li><span class="badge badge-done">✓</span> RestrictedTermsReloadScheduler + testes</li>
+        </ul>
+
+        <h3>9. Idempotência e Serviço Principal</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> IdempotencyService + testes</li>
+            <li><span class="badge badge-done">✓</span> KeywordScreeningService + testes + <span class="badge badge-property">P7</span></li>
+        </ul>
+
+        <h3>10. Presentation Layer</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> DTOs + Controller + GlobalExceptionHandler</li>
+            <li><span class="badge badge-done">✓</span> Testes + <span class="badge badge-property">P9</span> <span class="badge badge-property">P10</span> <span class="badge badge-property">P11</span></li>
+        </ul>
+
+        <h3>12. Testes de Integração</h3>
+        <ul>
+            <li><span class="badge badge-done">✓</span> End-to-end (Testcontainers + PostgreSQL)</li>
+            <li><span class="badge badge-done">✓</span> Cache reload com banco real</li>
+            <li><span class="badge badge-done">✓</span> Race condition (threads concorrentes)</li>
+            <li><span class="badge badge-done">✓</span> <span class="badge badge-property">P7</span> integração com banco real</li>
+        </ul>
+    </div>
+</div>
+
+<!-- PROPERTIES SECTION (always visible) -->
+<h2 id="properties">Propriedades de Corretude (PBT)</h2>
+<p>11 propriedades formais validadas com <strong>Kotest Property Testing</strong> — 1000 iterações por propriedade.</p>
+
+<table>
+    <thead>
+        <tr><th>#</th><th>Propriedade</th><th>Componente</th><th>Valida</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><span class="badge badge-property">P1</span></td><td>Normalização é idempotente: <code>normalize(normalize(s)) == normalize(s)</code></td><td>TextNormalizer</td><td>Req 2.5, 2.6</td></tr>
+        <tr><td><span class="badge badge-property">P2</span></td><td>Resultado normalizado é ASCII minúsculo: <code>[a-z0-9 ]*</code>, sem espaços duplos</td><td>TextNormalizer</td><td>Req 2.1–2.4</td></tr>
+        <tr><td><span class="badge badge-property">P3</span></td><td>Detecção invariante a variações de formatação</td><td>KeywordMatcher</td><td>Req 1.1, 1.2, 3.2, 3.3</td></tr>
+        <tr><td><span class="badge badge-property">P4</span></td><td>Ausência de termos implica <code>matched=false</code></td><td>KeywordMatcher</td><td>Req 1.3, 3.1</td></tr>
+        <tr><td><span class="badge badge-property">P5</span></td><td>Termos inativos não produzem matches</td><td>KeywordMatcher</td><td>Req 3.5</td></tr>
+        <tr><td><span class="badge badge-property">P6</span></td><td>Termos no cache estão normalizados</td><td>RestrictedTermsCache</td><td>Req 4.6</td></tr>
+        <tr><td><span class="badge badge-property">P7</span></td><td>Idempotência: 2ª chamada = 1ª, 1 RuleExecution no DB</td><td>KeywordScreeningService</td><td>Req 5.1–5.3</td></tr>
+        <tr><td><span class="badge badge-property">P8</span></td><td>Round-trip de persistência: <code>deserialize(serialize(r)) == r</code></td><td>RuleExecutionMapper</td><td>Req 5.4, 5.6</td></tr>
+        <tr><td><span class="badge badge-property">P9</span></td><td>Requisições válidas → HTTP 200 + <code>ruleCode="KEYWORD_SCREENING"</code></td><td>Controller</td><td>Req 1.4, 6.1, 6.2</td></tr>
+        <tr><td><span class="badge badge-property">P10</span></td><td>transactionId em branco → HTTP 400</td><td>Controller</td><td>Req 6.3</td></tr>
+        <tr><td><span class="badge badge-property">P11</span></td><td>description vazia → HTTP 400</td><td>Controller</td><td>Req 6.4</td></tr>
+    </tbody>
+</table>
+
+<script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.target.classList.add('active');
+        mermaid.run();
+    }
+</script>
+
+</body>
+</html>

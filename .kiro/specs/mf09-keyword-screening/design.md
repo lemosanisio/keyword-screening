@@ -1,8 +1,8 @@
-# Design Document — MF09 Keyword Screening
+# Design Document — Keyword Screening
 
 ## Overview
 
-A feature **MF09 - Keyword Screening** implementa uma regra de screening que analisa a descrição de transações PIX em busca de termos restritos cadastrados pela área de Compliance. O objetivo é detectar, em tempo real e com alta performance (< 10ms), possíveis indícios de terrorismo, lavagem de dinheiro (AML), fraude, crime financeiro e sanções.
+A feature **Keyword Screening** implementa uma regra de screening que analisa a descrição de transações PIX em busca de termos restritos cadastrados pela área de Compliance. O objetivo é detectar, em tempo real e com alta performance (< 10ms), possíveis indícios de terrorismo, lavagem de dinheiro (AML), fraude, crime financeiro e sanções.
 
 ### Decisões de Design
 
@@ -11,12 +11,12 @@ A feature **MF09 - Keyword Screening** implementa uma regra de screening que ana
 | Cache em memória | `Set<RestrictedTerm>` com `@Volatile` | Leitura O(n) simples, sem dependência de infraestrutura externa, resiliência a falhas de banco |
 | Idempotência | Constraint UNIQUE no banco + verificação prévia | Garante consistência sem lock distribuído; race condition tratada por limpeza pós-inserção |
 | Normalização | Pipeline sequencial imutável | Determinismo e testabilidade; cada etapa é pura e componível |
-| Extensibilidade | Interface `ScreeningRule` | Permite adicionar MF10, MF11 etc. sem alterar o núcleo do domínio |
+| Extensibilidade | Interface `ScreeningRule` | Permite adicionar novas regras de screening sem alterar o núcleo do domínio |
 | Persistência do resultado | JSONB no PostgreSQL | Flexibilidade para evoluir o schema do resultado sem migrações de coluna |
 
 ### Contexto de Extensibilidade
 
-O bounded context `keyword-screening` é projetado para suportar múltiplas regras de screening (MF09, MF10, MF11 etc.) via interface genérica `ScreeningRule`. A MF09 é a primeira implementação concreta dessa interface.
+O bounded context `keyword-screening` é projetado para suportar múltiplas regras de screening via interface genérica `ScreeningRule`. A regra `KeywordScreening` é a primeira implementação concreta dessa interface.
 
 ---
 
@@ -26,15 +26,15 @@ O bounded context `keyword-screening` é projetado para suportar múltiplas regr
 
 ```mermaid
 C4Context
-    title MF09 Keyword Screening — Contexto
+    title Keyword Screening — Contexto
 
     Person(compliance, "Analista de Compliance", "Cadastra termos restritos")
-    System(mf09, "MF09 Keyword Screening", "Avalia descrições PIX contra termos restritos")
+    System(keywordScreening, "Keyword Screening", "Avalia descrições PIX contra termos restritos")
     SystemDb(postgres, "PostgreSQL", "Persiste termos restritos e execuções de regras")
     System_Ext(consumer, "Sistema Consumidor", "Submete transações PIX para avaliação")
 
-    Rel(consumer, mf09, "POST /v1/rules/mf09/evaluate", "JSON/HTTPS")
-    Rel(mf09, postgres, "Lê termos restritos / Persiste execuções", "JDBC")
+    Rel(consumer, keywordScreening, "POST /v1/rules/keyword-screening/evaluate", "JSON/HTTPS")
+    Rel(keywordScreening, postgres, "Lê termos restritos / Persiste execuções", "JDBC")
     Rel(compliance, postgres, "Cadastra/desativa termos restritos", "SQL/Admin")
 ```
 
@@ -43,18 +43,18 @@ C4Context
 ```mermaid
 graph TD
     subgraph Presentation
-        CTRL[MF09Controller]
-        REQ[EvaluateMF09Request]
-        RESP[EvaluateMF09Response]
+        CTRL[KeywordScreeningController]
+        REQ[EvaluateKeywordScreeningRequest]
+        RESP[EvaluateKeywordScreeningResponse]
     end
 
     subgraph Application
-        UC[EvaluateMF09UseCase]
-        SVC[MF09ScreeningService]
+        UC[EvaluateKeywordScreeningUseCase]
+        SVC[KeywordScreeningService]
         IDEM[IdempotencyService]
         CACHE[RestrictedTermsCache]
-        CMD[EvaluateMF09Command]
-        RES[EvaluateMF09Result]
+        CMD[EvaluateKeywordScreeningCommand]
+        RES[EvaluateKeywordScreeningResult]
     end
 
     subgraph Domain
@@ -94,24 +94,24 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant C as Consumer
-    participant CTRL as MF09Controller
-    participant UC as EvaluateMF09UseCase
+    participant CTRL as KeywordScreeningController
+    participant UC as EvaluateKeywordScreeningUseCase
     participant IDEM as IdempotencyService
-    participant SVC as MF09ScreeningService
+    participant SVC as KeywordScreeningService
     participant NORM as TextNormalizer
     participant CACHE as RestrictedTermsCache
     participant MATCH as KeywordMatcher
     participant DB as PostgreSQL
 
-    C->>CTRL: POST /v1/rules/mf09/evaluate {transactionId, description}
-    CTRL->>UC: execute(EvaluateMF09Command)
-    UC->>IDEM: findExisting("MF09:transactionId")
+    C->>CTRL: POST /v1/rules/keyword-screening/evaluate {transactionId, description}
+    CTRL->>UC: execute(EvaluateKeywordScreeningCommand)
+    UC->>IDEM: findExisting("KEYWORD_SCREENING:transactionId")
     IDEM->>DB: SELECT rule_execution WHERE transaction_id AND rule_code
     alt Execução existente encontrada
         DB-->>IDEM: RuleExecution
-        IDEM-->>UC: EvaluateMF09Result (cached)
-        UC-->>CTRL: EvaluateMF09Result
-        CTRL-->>C: HTTP 200 EvaluateMF09Response
+        IDEM-->>UC: EvaluateKeywordScreeningResult (cached)
+        UC-->>CTRL: EvaluateKeywordScreeningResult
+        CTRL-->>C: HTTP 200 EvaluateKeywordScreeningResponse
     else Nenhuma execução encontrada
         DB-->>IDEM: null
         IDEM-->>UC: null
@@ -122,11 +122,11 @@ sequenceDiagram
         CACHE-->>SVC: Set<RestrictedTerm>
         SVC->>MATCH: findMatches(normalizedDescription, terms)
         MATCH-->>SVC: List<MatchResult>
-        SVC->>DB: INSERT rule_execution (transactionId, "MF09", result)
+        SVC->>DB: INSERT rule_execution (transactionId, "KEYWORD_SCREENING", result)
         DB-->>SVC: RuleExecution persisted
-        SVC-->>UC: EvaluateMF09Result
-        UC-->>CTRL: EvaluateMF09Result
-        CTRL-->>C: HTTP 200 EvaluateMF09Response
+        SVC-->>UC: EvaluateKeywordScreeningResult
+        UC-->>CTRL: EvaluateKeywordScreeningResult
+        CTRL-->>C: HTTP 200 EvaluateKeywordScreeningResponse
     end
 ```
 
@@ -153,7 +153,7 @@ stateDiagram-v2
 ```kotlin
 /**
  * Interface genérica para regras de screening.
- * Permite adicionar MF10, MF11 etc. sem alterar o núcleo do domínio.
+ * Permite adicionar novas regras sem alterar o núcleo do domínio.
  */
 interface ScreeningRule {
     val ruleCode: String
@@ -242,7 +242,7 @@ data class RuleExecution(
     val result: ScreeningResult,
     val createdAt: Instant
 ) {
-    /** Chave de idempotência: MF09:{transactionId} */
+    /** Chave de idempotência: KEYWORD_SCREENING:{transactionId} */
     val idempotencyKey: String get() = "$ruleCode:$transactionId"
 }
 
@@ -266,40 +266,40 @@ interface RuleExecutionRepository {
 
 ### Application Layer
 
-#### EvaluateMF09UseCase
+#### EvaluateKeywordScreeningUseCase
 
 ```kotlin
-interface EvaluateMF09UseCase {
-    fun execute(command: EvaluateMF09Command): EvaluateMF09Result
+interface EvaluateKeywordScreeningUseCase {
+    fun execute(command: EvaluateKeywordScreeningCommand): EvaluateKeywordScreeningResult
 }
 
-data class EvaluateMF09Command(
+data class EvaluateKeywordScreeningCommand(
     val transactionId: String,
     val description: String
 )
 
-data class EvaluateMF09Result(
+data class EvaluateKeywordScreeningResult(
     val ruleCode: String,
     val matched: Boolean,
     val matches: List<MatchResult>
 )
 ```
 
-#### MF09ScreeningService
+#### KeywordScreeningService
 
 ```kotlin
 @Service
-class MF09ScreeningService(
+class KeywordScreeningService(
     private val textNormalizer: TextNormalizer,
     private val keywordMatcher: KeywordMatcher,
     private val restrictedTermsCache: RestrictedTermsCache,
     private val idempotencyService: IdempotencyService,
     private val ruleExecutionRepository: RuleExecutionRepository
-) : EvaluateMF09UseCase, ScreeningRule {
+) : EvaluateKeywordScreeningUseCase, ScreeningRule {
 
-    override val ruleCode = "MF09"
+    override val ruleCode = "KEYWORD_SCREENING"
 
-    override fun execute(command: EvaluateMF09Command): EvaluateMF09Result
+    override fun execute(command: EvaluateKeywordScreeningCommand): EvaluateKeywordScreeningResult
 
     override fun evaluate(transactionId: String, description: String): ScreeningResult
 }
@@ -405,15 +405,15 @@ class RuleExecutionEntity(
 
 ```kotlin
 @RestController
-@RequestMapping("/v1/rules/mf09")
-class MF09Controller(
-    private val evaluateMF09UseCase: EvaluateMF09UseCase
+@RequestMapping("/v1/rules/keyword-screening")
+class KeywordScreeningController(
+    private val evaluateKeywordScreeningUseCase: EvaluateKeywordScreeningUseCase
 ) {
     @PostMapping("/evaluate")
-    fun evaluate(@Valid @RequestBody request: EvaluateMF09Request): ResponseEntity<EvaluateMF09Response>
+    fun evaluate(@Valid @RequestBody request: EvaluateKeywordScreeningRequest): ResponseEntity<EvaluateKeywordScreeningResponse>
 }
 
-data class EvaluateMF09Request(
+data class EvaluateKeywordScreeningRequest(
     @field:NotBlank(message = "transactionId é obrigatório")
     val transactionId: String?,
 
@@ -422,7 +422,7 @@ data class EvaluateMF09Request(
     val description: String?
 )
 
-data class EvaluateMF09Response(
+data class EvaluateKeywordScreeningResponse(
     val ruleCode: String,
     val matched: Boolean,
     val matches: List<MatchResultResponse>
@@ -470,7 +470,7 @@ CREATE INDEX idx_rule_execution_lookup ON rule_execution(transaction_id, rule_co
 
 ```json
 {
-  "ruleCode": "MF09",
+  "ruleCode": "KEYWORD_SCREENING",
   "matched": true,
   "matches": [
     { "term": "lavagem", "category": "AML" },
@@ -577,9 +577,9 @@ A biblioteca de PBT escolhida é **[Kotest Property Testing](https://kotest.io/d
 
 ---
 
-### Property 9: Requisições válidas retornam HTTP 200 com ruleCode="MF09"
+### Property 9: Requisições válidas retornam HTTP 200 com ruleCode="KEYWORD_SCREENING"
 
-*For any* requisição com `transactionId` não vazio e `description` não vazia (até 140 caracteres), a resposta deve ser HTTP 200 e o corpo deve conter `ruleCode="MF09"`.
+*For any* requisição com `transactionId` não vazio e `description` não vazia (até 140 caracteres), a resposta deve ser HTTP 200 e o corpo deve conter `ruleCode="KEYWORD_SCREENING"`.
 
 **Validates: Requirements 1.4, 6.1, 6.2**
 
@@ -692,8 +692,8 @@ A estratégia combina testes unitários com exemplos específicos e testes basea
 | `KeywordMatcher` | Match exato, match parcial (substring), sem match, termos inativos ignorados |
 | `IdempotencyService` | Execução existente retorna resultado salvo; execução nova persiste e retorna; race condition tratada |
 | `RestrictedTermsCache` | Inicialização carrega termos normalizados; reload substitui cache; falha no reload mantém cache |
-| `MF09ScreeningService` | Fluxo completo com mock de dependências |
-| `MF09Controller` | Validação de request (400), resposta de sucesso (200) |
+| `KeywordScreeningService` | Fluxo completo com mock de dependências |
+| `KeywordScreeningController` | Validação de request (400), resposta de sucesso (200) |
 
 ### Testes de Propriedade (PBT)
 
@@ -713,7 +713,7 @@ Cada teste de propriedade deve ser anotado com o tag correspondente:
 | P6: Cache normalizado | `Arb.list(Arb.restrictedTerm())` | `∀ t ∈ cache: t.term == normalize(t.term)` |
 | P7: Idempotência de avaliação | `Arb.string(minSize=1)` × 2 | Resultado idêntico na segunda chamada; 1 RuleExecution no banco |
 | P8: Round-trip de persistência | `Arb.screeningResult()` | `deserialize(serialize(result)) == result` |
-| P9: Válido → HTTP 200 + ruleCode | `Arb.string(minSize=1, maxSize=140)` × 2 | HTTP 200, `ruleCode="MF09"` |
+| P9: Válido → HTTP 200 + ruleCode | `Arb.string(minSize=1, maxSize=140)` × 2 | HTTP 200, `ruleCode="KEYWORD_SCREENING"` |
 | P10: transactionId branco → HTTP 400 | `Arb.stringPattern("\\s*")` | HTTP 400 |
 | P11: description vazia → HTTP 400 | `Arb.constant("")` + null | HTTP 400 |
 
@@ -730,7 +730,7 @@ Cada teste de propriedade deve ser anotado com o tag correspondente:
 
 | Cenário | Tipo |
 |---|---|
-| Endpoint `POST /v1/rules/mf09/evaluate` responde | Smoke |
+| Endpoint `POST /v1/rules/keyword-screening/evaluate` responde | Smoke |
 | Cache inicializado no startup com termos do banco | Smoke |
 | Performance < 10ms para descrições de até 140 chars | Benchmark |
 
