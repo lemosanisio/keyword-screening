@@ -5,19 +5,23 @@ import br.com.screening.domain.model.MatchResult
 import br.com.screening.domain.model.RuleExecution
 import br.com.screening.domain.model.ScreeningResult
 import br.com.screening.domain.repository.RuleExecutionRepository
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.nulls.shouldBeNull
-import io.kotest.matchers.shouldBe
+import br.com.shared.domain.valueobject.TransactionId
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import java.time.Instant
 
-class IdempotencyServiceTest : StringSpec({
+class IdempotencyServiceTest {
 
-    val transactionId = "TX-001"
-    val ruleCode = "KEYWORD_SCREENING"
+    private val transactionId = TransactionId("TX-001")
+    private val ruleCode = "KEYWORD_SCREENING"
 
-    "findExisting returns result when execution exists" {
+    @Test
+    @DisplayName("findExisting returns result when execution exists")
+    fun findExistingReturnsResultWhenExists() {
         val repo = mockk<RuleExecutionRepository>()
         val expectedResult = ScreeningResult(
             ruleCode = ruleCode,
@@ -36,20 +40,24 @@ class IdempotencyServiceTest : StringSpec({
         val service = IdempotencyService(repo)
         val result = service.findExisting(transactionId, ruleCode)
 
-        result shouldBe expectedResult
+        assertEquals(expectedResult, result)
     }
 
-    "findExisting returns null when no execution exists" {
+    @Test
+    @DisplayName("findExisting returns null when no execution exists")
+    fun findExistingReturnsNullWhenNotExists() {
         val repo = mockk<RuleExecutionRepository>()
         every { repo.findByTransactionIdAndRuleCode(transactionId, ruleCode) } returns null
 
         val service = IdempotencyService(repo)
         val result = service.findExisting(transactionId, ruleCode)
 
-        result.shouldBeNull()
+        assertNull(result)
     }
 
-    "persist saves and returns result" {
+    @Test
+    @DisplayName("persist saves and returns result")
+    fun persistSavesAndReturnsResult() {
         val repo = mockk<RuleExecutionRepository>()
         val screeningResult = ScreeningResult(
             ruleCode = ruleCode,
@@ -64,17 +72,18 @@ class IdempotencyServiceTest : StringSpec({
         val service = IdempotencyService(repo)
         val result = service.persist(transactionId, ruleCode, screeningResult)
 
-        result shouldBe screeningResult
+        assertEquals(screeningResult, result)
     }
 
-    "persist handles race condition - returns whatever repo returned" {
+    @Test
+    @DisplayName("persist handles race condition - returns whatever repo returned")
+    fun persistHandlesRaceCondition() {
         val repo = mockk<RuleExecutionRepository>()
         val originalResult = ScreeningResult(
             ruleCode = ruleCode,
             matched = true,
             matches = listOf(MatchResult("lavagem", Category.AML))
         )
-        // Simulates the repo returning a different result (existing record from race condition)
         val existingResult = ScreeningResult(
             ruleCode = ruleCode,
             matched = true,
@@ -91,7 +100,6 @@ class IdempotencyServiceTest : StringSpec({
         val service = IdempotencyService(repo)
         val result = service.persist(transactionId, ruleCode, originalResult)
 
-        // Service returns whatever the repo returned, even if different from the original
-        result shouldBe existingResult
+        assertEquals(existingResult, result)
     }
-})
+}

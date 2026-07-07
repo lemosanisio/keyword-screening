@@ -4,13 +4,14 @@ import br.com.shared.domain.DomainException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import java.time.Instant
 import java.util.UUID
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = ["br.com.screening.infrastructure.input.http"])
 class GlobalExceptionHandler {
 
     private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
@@ -24,6 +25,28 @@ class GlobalExceptionHandler {
             status = 400,
             error = "VALIDACAO_FALHOU",
             message = message
+        )
+        return ResponseEntity.badRequest().body(error)
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
+        val error = ErrorResponse(
+            timestamp = Instant.now(),
+            status = 400,
+            error = "VALIDACAO_FALHOU",
+            message = ex.message ?: "Argumento inválido"
+        )
+        return ResponseEntity.badRequest().body(error)
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<ErrorResponse> {
+        val error = ErrorResponse(
+            timestamp = Instant.now(),
+            status = 400,
+            error = "REQUISICAO_INVALIDA",
+            message = "Corpo da requisição inválido ou campos obrigatórios ausentes"
         )
         return ResponseEntity.badRequest().body(error)
     }

@@ -1,13 +1,16 @@
 package br.com.screening.infrastructure.output.scheduler
 
 import br.com.screening.application.cache.RestrictedTermsCache
-import io.kotest.core.spec.style.StringSpec
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 
-class RestrictedTermsReloadSchedulerTest : StringSpec({
+class RestrictedTermsReloadSchedulerTest {
 
-    "reload delegates to restrictedTermsCache.reload()" {
+    @Test
+    @DisplayName("reload delegates to restrictedTermsCache.reload()")
+    fun reloadDelegatesToCache() {
         val cache = mockk<RestrictedTermsCache>(relaxed = true)
         val scheduler = RestrictedTermsReloadScheduler(cache)
 
@@ -15,4 +18,4 @@ class RestrictedTermsReloadSchedulerTest : StringSpec({
 
         verify(exactly = 1) { cache.reload() }
     }
-})
+}

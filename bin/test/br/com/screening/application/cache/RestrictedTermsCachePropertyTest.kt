@@ -4,33 +4,30 @@ import br.com.screening.domain.model.Category
 import br.com.screening.domain.model.RestrictedTerm
 import br.com.screening.domain.repository.RestrictedTermRepository
 import br.com.screening.domain.service.TextNormalizer
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.property.Arb
-import io.kotest.property.arbitrary.enum
-import io.kotest.property.arbitrary.list
-import io.kotest.property.arbitrary.long
-import io.kotest.property.arbitrary.map
-import io.kotest.property.arbitrary.string
-import io.kotest.property.forAll
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.RepeatedTest
 import java.time.Instant
+import kotlin.random.Random
 
 /**
  * Property test para [RestrictedTermsCache].
  *
  * Property 6 — Validates: Requirements 4.6
  */
-// Feature: mf09-keyword-screening, Property 6: Termos no cache estão normalizados
-class RestrictedTermsCachePropertyTest : StringSpec({
+class RestrictedTermsCachePropertyTest {
 
-    val normalizer = TextNormalizer()
+    private val normalizer = TextNormalizer()
 
-    // Feature: mf09-keyword-screening, Property 6: Termos no cache estão normalizados
-    "todos os termos no cache estão normalizados após initialize" {
-        val arbRestrictedTerm = Arb.string(1..50).map { term ->
+    private fun randomTerms(): List<RestrictedTerm> {
+        val count = Random.nextInt(1, 21)
+        return (1..count).map {
+            val length = Random.nextInt(1, 51)
+            val term = buildString { repeat(length) { append(Char(Random.nextInt(32, 127))) } }
             RestrictedTerm(
-                id = 1L,
+                id = it.toLong(),
                 term = term,
                 category = Category.AML,
                 active = true,
@@ -38,17 +35,20 @@ class RestrictedTermsCachePropertyTest : StringSpec({
                 updatedAt = Instant.now()
             )
         }
+    }
 
-        forAll(Arb.list(arbRestrictedTerm, 1..20)) { terms ->
-            val repo = mockk<RestrictedTermRepository>()
-            every { repo.findAllActive() } returns terms
+    @RepeatedTest(200)
+    @DisplayName("todos os termos no cache estão normalizados após initialize")
+    fun allTermsInCacheAreNormalizedAfterInitialize() {
+        val terms = randomTerms()
+        val repo = mockk<RestrictedTermRepository>()
+        every { repo.findAllActive() } returns terms
 
-            val cache = RestrictedTermsCache(repo, normalizer)
-            cache.initialize()
+        val cache = RestrictedTermsCache(repo, normalizer)
+        cache.initialize()
 
-            cache.getActiveTerms().all { t ->
-                t.term == normalizer.normalize(t.term)
-            }
+        assertTrue(cache.getActiveTerms().all { t -> t.term == normalizer.normalize(t.term) }) {
+            "All terms in cache should be normalized"
         }
     }
-})
+}

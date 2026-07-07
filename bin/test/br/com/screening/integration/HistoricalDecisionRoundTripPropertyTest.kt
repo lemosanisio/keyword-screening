@@ -3,14 +3,11 @@ package br.com.screening.integration
 import br.com.screening.domain.model.Classification
 import br.com.screening.domain.model.HistoricalDecision
 import br.com.screening.domain.port.HistoricalDecisionRepository
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.collections.shouldNotBeEmpty
-import io.kotest.matchers.shouldBe
-import io.kotest.property.Arb
-import io.kotest.property.PropTestConfig
-import io.kotest.property.arbitrary.*
-import io.kotest.property.forAll
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.RepeatedTest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -19,21 +16,19 @@ import org.testcontainers.containers.PostgreSQLContainer
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import kotlin.random.Random
 
 /**
  * Property-based integration test for round-trip persistence of analyst feedback.
  *
- * **Property 6: Round-trip de persistência de feedback**
- * **Validates: Requirements 8.1, 8.2, 12.7**
- *
- * Uses Testcontainers + real PostgreSQL to verify that:
- * - save() followed by findByKeyword() recovers the persisted decision
- * - All fields are preserved through the round-trip (keyword, description, analystDecision)
+ * Property 6: Round-trip de persistência de feedback
+ * Validates: Requirements 8.1, 8.2, 12.7
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class HistoricalDecisionRoundTripPropertyTest(
-    @Autowired private val historicalDecisionRepository: HistoricalDecisionRepository
-) : StringSpec() {
+class HistoricalDecisionRoundTripPropertyTest {
+
+    @Autowired
+    private lateinit var historicalDecisionRepository: HistoricalDecisionRepository
 
     companion object {
         val postgres = PostgreSQLContainer("postgres:16-alpine")
@@ -55,95 +50,65 @@ class HistoricalDecisionRoundTripPropertyTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
+    private fun randomAlphanumeric(minLen: Int, maxLen: Int): String {
+        val len = Random.nextInt(minLen, maxLen + 1)
+        val chars = ('a'..'z') + ('0'..'9')
+        return buildString { repeat(len) { append(chars.random()) } }
+    }
 
-    private fun arbClassification(): Arb<Classification> =
-        Arb.element(Classification.FALSE_POSITIVE, Classification.SUSPICIOUS, Classification.UNCERTAIN)
+    @RepeatedTest(50)
+    @DisplayName("Property 6: save seguido de findByKeyword recupera a decisão com todos os campos preservados")
+    fun saveAndRetrievePreservesAllFields() {
+        val keyword = "${randomAlphanumeric(3, 20)}_${UUID.randomUUID().toString().take(8)}"
+        val description = randomAlphanumeric(5, 100)
+        val analystDecision = Classification.entries[Random.nextInt(Classification.entries.size)]
+        val createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS)
 
-    private fun arbKeyword(): Arb<String> =
-        Arb.string(3..20, Codepoint.alphanumeric()).filter { it.isNotBlank() }
+        val decision = HistoricalDecision(
+            keyword = keyword,
+            description = description,
+            analystDecision = analystDecision,
+            createdAt = createdAt
+        )
 
-    private fun arbDescription(): Arb<String> =
-        Arb.string(5..100, Codepoint.alphanumeric()).filter { it.isNotBlank() }
+        val saved = historicalDecisionRepository.save(decision)
+        val retrieved = historicalDecisionRepository.findByKeyword(keyword)
 
-    init {
-        "Property 6: save seguido de findByKeyword recupera a decisão com todos os campos preservados" {
-            forAll(
-                PropTestConfig(iterations = 50),
-                arbKeyword(),
-                arbDescription(),
-                arbClassification()
-            ) { keyword, description, analystDecision ->
-                // Generate unique keyword to avoid interference between iterations
-                val uniqueKeyword = "${keyword}_${UUID.randomUUID().toString().take(8)}"
-                val createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+        assertTrue(retrieved.isNotEmpty())
+        assertTrue(retrieved.all { it.keyword == keyword })
 
-                val decision = HistoricalDecision(
-                    keyword = uniqueKeyword,
-                    description = description,
-                    analystDecision = analystDecision,
-                    createdAt = createdAt
-                )
+        val matchingDecision = retrieved.find { it.description == description }
+        assertNotNull(matchingDecision)
+        assertEquals(keyword, matchingDecision!!.keyword)
+        assertEquals(description, matchingDecision.description)
+        assertEquals(analystDecision, matchingDecision.analystDecision)
+        assertNotNull(matchingDecision.id)
+        assertNotNull(saved.id)
+    }
 
-                // Save
-                val saved = historicalDecisionRepository.save(decision)
+    @RepeatedTest(20)
+    @DisplayName("Property 6 (multiple): save multiple decisions for same keyword, all recoverable via findByKeyword")
+    fun multipleDecisionsSameKeywordAllRecoverable() {
+        val keyword = "${randomAlphanumeric(3, 20)}_multi_${UUID.randomUUID().toString().take(8)}"
+        val count = Random.nextInt(2, 6)
+        val baseTime = Instant.now().minus(1, ChronoUnit.HOURS)
 
-                // Retrieve by keyword
-                val retrieved = historicalDecisionRepository.findByKeyword(uniqueKeyword)
-
-                // Verify round-trip: the saved decision is recoverable
-                val found = retrieved.isNotEmpty()
-                val matchesKeyword = retrieved.all { it.keyword == uniqueKeyword }
-
-                // Find the decision we just saved (by matching description for uniqueness)
-                val matchingDecision = retrieved.find { it.description == description }
-                val fieldsPreserved = matchingDecision != null &&
-                    matchingDecision.keyword == uniqueKeyword &&
-                    matchingDecision.description == description &&
-                    matchingDecision.analystDecision == analystDecision &&
-                    matchingDecision.id != null
-
-                // Verify saved entity has id assigned
-                val idAssigned = saved.id != null
-
-                found && matchesKeyword && fieldsPreserved && idAssigned
-            }
+        (1..count).forEach { i ->
+            val decision = HistoricalDecision(
+                keyword = keyword,
+                description = "Description $i for $keyword",
+                analystDecision = Classification.entries[i % Classification.entries.size],
+                createdAt = baseTime.plus(i.toLong(), ChronoUnit.MINUTES)
+            )
+            historicalDecisionRepository.save(decision)
         }
 
-        "Property 6 (multiple): save multiple decisions for same keyword, all recoverable via findByKeyword" {
-            forAll(
-                PropTestConfig(iterations = 20),
-                arbKeyword(),
-                Arb.int(2..5)
-            ) { keyword, count ->
-                val uniqueKeyword = "${keyword}_multi_${UUID.randomUUID().toString().take(8)}"
-                val baseTime = Instant.now().minus(1, ChronoUnit.HOURS)
+        val retrieved = historicalDecisionRepository.findByKeyword(keyword)
 
-                // Save multiple decisions for the same keyword
-                val decisions = (1..count).map { i ->
-                    val decision = HistoricalDecision(
-                        keyword = uniqueKeyword,
-                        description = "Description $i for $uniqueKeyword",
-                        analystDecision = Classification.entries[i % Classification.entries.size],
-                        createdAt = baseTime.plus(i.toLong(), ChronoUnit.MINUTES)
-                    )
-                    historicalDecisionRepository.save(decision)
-                }
+        assertEquals(count, retrieved.size)
+        assertTrue(retrieved.all { it.keyword == keyword })
 
-                // Retrieve all by keyword
-                val retrieved = historicalDecisionRepository.findByKeyword(uniqueKeyword)
-
-                // All saved decisions should be recoverable
-                val allFound = retrieved.size == count
-                val allMatchKeyword = retrieved.all { it.keyword == uniqueKeyword }
-
-                // Ordered by createdAt DESC
-                val orderedDesc = retrieved.zipWithNext().all { (a, b) ->
-                    !a.createdAt.isBefore(b.createdAt)
-                }
-
-                allFound && allMatchKeyword && orderedDesc
-            }
-        }
+        val orderedDesc = retrieved.zipWithNext().all { (a, b) -> !a.createdAt.isBefore(b.createdAt) }
+        assertTrue(orderedDesc)
     }
 }

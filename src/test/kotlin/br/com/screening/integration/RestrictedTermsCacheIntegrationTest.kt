@@ -2,9 +2,10 @@ package br.com.screening.integration
 
 import br.com.screening.application.cache.RestrictedTermsCache
 import br.com.screening.domain.service.TextNormalizer
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
@@ -16,11 +17,16 @@ import org.testcontainers.junit.jupiter.Testcontainers
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-class RestrictedTermsCacheIntegrationTest(
-    @Autowired private val restrictedTermsCache: RestrictedTermsCache,
-    @Autowired private val textNormalizer: TextNormalizer,
-    @Autowired private val jdbcTemplate: JdbcTemplate
-) : StringSpec() {
+class RestrictedTermsCacheIntegrationTest {
+
+    @Autowired
+    private lateinit var restrictedTermsCache: RestrictedTermsCache
+
+    @Autowired
+    private lateinit var textNormalizer: TextNormalizer
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     companion object {
         @Container
@@ -39,29 +45,28 @@ class RestrictedTermsCacheIntegrationTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
+    @Test
+    @DisplayName("reload reflects DB changes: new term inserted via JDBC is present in cache after reload")
+    fun reloadReflectsDbChanges() {
+        val newTerm = "contrabando"
+        jdbcTemplate.update(
+            "INSERT INTO restricted_term (term, category, active, created_at, updated_at) VALUES (?, ?, TRUE, NOW(), NOW())",
+            newTerm, "FRAUD"
+        )
 
-    init {
-        "reload reflects DB changes: new term inserted via JDBC is present in cache after reload" {
-            val newTerm = "contrabando"
-            jdbcTemplate.update(
-                "INSERT INTO restricted_term (term, category, active, created_at, updated_at) VALUES (?, ?, TRUE, NOW(), NOW())",
-                newTerm,
-                "FRAUD"
-            )
+        restrictedTermsCache.reload()
 
-            restrictedTermsCache.reload()
+        val terms = restrictedTermsCache.getActiveTerms()
+        assertTrue(terms.any { it.term == newTerm })
+    }
 
-            val terms = restrictedTermsCache.getActiveTerms()
-            terms.any { it.term == newTerm } shouldBe true
-        }
+    @Test
+    @DisplayName("all terms in cache are normalized after load")
+    fun allTermsInCacheAreNormalized() {
+        val terms = restrictedTermsCache.getActiveTerms()
 
-        "all terms in cache are normalized after load" {
-            val terms = restrictedTermsCache.getActiveTerms()
-
-            terms.forEach { term ->
-                term.term shouldBe textNormalizer.normalize(term.term)
-            }
+        terms.forEach { term ->
+            assertEquals(textNormalizer.normalize(term.term), term.term)
         }
     }
 }

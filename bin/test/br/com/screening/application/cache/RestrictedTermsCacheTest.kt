@@ -4,18 +4,22 @@ import br.com.screening.domain.model.Category
 import br.com.screening.domain.model.RestrictedTerm
 import br.com.screening.domain.repository.RestrictedTermRepository
 import br.com.screening.domain.service.TextNormalizer
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.shouldBe
-import io.kotest.assertions.throwables.shouldThrow
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import java.time.Instant
 
-class RestrictedTermsCacheTest : StringSpec({
+class RestrictedTermsCacheTest {
 
-    val normalizer = TextNormalizer()
+    private val normalizer = TextNormalizer()
 
-    "initialize loads normalized terms from repository" {
+    @Test
+    @DisplayName("initialize loads normalized terms from repository")
+    fun initializeLoadsNormalizedTerms() {
         val repo = mockk<RestrictedTermRepository>()
         val terms = listOf(
             RestrictedTerm(1L, "Lavagem", Category.AML, true, Instant.now(), Instant.now()),
@@ -27,12 +31,14 @@ class RestrictedTermsCacheTest : StringSpec({
         cache.initialize()
 
         val activeTerms = cache.getActiveTerms()
-        activeTerms.size shouldBe 2
-        activeTerms.all { it.term == normalizer.normalize(it.term) } shouldBe true
-        activeTerms.map { it.term }.toSet() shouldBe setOf("lavagem", "terrorismo")
+        assertEquals(2, activeTerms.size)
+        assertTrue(activeTerms.all { it.term == normalizer.normalize(it.term) })
+        assertEquals(setOf("lavagem", "terrorismo"), activeTerms.map { it.term }.toSet())
     }
 
-    "reload replaces cache with new terms" {
+    @Test
+    @DisplayName("reload replaces cache with new terms")
+    fun reloadReplacesCacheWithNewTerms() {
         val repo = mockk<RestrictedTermRepository>()
         val initialTerms = listOf(
             RestrictedTerm(1L, "lavagem", Category.AML, true, Instant.now(), Instant.now())
@@ -45,14 +51,16 @@ class RestrictedTermsCacheTest : StringSpec({
 
         val cache = RestrictedTermsCache(repo, normalizer)
         cache.initialize()
-        cache.getActiveTerms().size shouldBe 1
+        assertEquals(1, cache.getActiveTerms().size)
 
         cache.reload()
-        cache.getActiveTerms().size shouldBe 2
-        cache.getActiveTerms().map { it.term }.toSet() shouldBe setOf("lavagem", "fraude")
+        assertEquals(2, cache.getActiveTerms().size)
+        assertEquals(setOf("lavagem", "fraude"), cache.getActiveTerms().map { it.term }.toSet())
     }
 
-    "failure on reload preserves previous cache" {
+    @Test
+    @DisplayName("failure on reload preserves previous cache")
+    fun failureOnReloadPreservesPreviousCache() {
         val repo = mockk<RestrictedTermRepository>()
         val initialTerms = listOf(
             RestrictedTerm(1L, "lavagem", Category.AML, true, Instant.now(), Instant.now())
@@ -61,21 +69,23 @@ class RestrictedTermsCacheTest : StringSpec({
 
         val cache = RestrictedTermsCache(repo, normalizer)
         cache.initialize()
-        cache.getActiveTerms().size shouldBe 1
+        assertEquals(1, cache.getActiveTerms().size)
 
         cache.reload()
-        cache.getActiveTerms().size shouldBe 1
-        cache.getActiveTerms().first().term shouldBe "lavagem"
+        assertEquals(1, cache.getActiveTerms().size)
+        assertEquals("lavagem", cache.getActiveTerms().first().term)
     }
 
-    "unavailable DB on startup throws exception" {
+    @Test
+    @DisplayName("unavailable DB on startup throws exception")
+    fun unavailableDbOnStartupThrowsException() {
         val repo = mockk<RestrictedTermRepository>()
         every { repo.findAllActive() } throws RuntimeException("DB unavailable")
 
         val cache = RestrictedTermsCache(repo, normalizer)
 
-        shouldThrow<RuntimeException> {
+        assertThrows(RuntimeException::class.java) {
             cache.initialize()
         }
     }
-})
+}

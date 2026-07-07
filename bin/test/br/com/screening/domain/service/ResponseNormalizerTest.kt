@@ -1,68 +1,87 @@
 package br.com.screening.domain.service
 
 import br.com.screening.domain.model.Classification
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 
 /**
  * Testes unitários para [ResponseNormalizer].
  * Requirements: 5.4, 5.5, 12.1, 12.2, 12.10
  */
-class ResponseNormalizerTest : StringSpec({
+class ResponseNormalizerTest {
 
-    val normalizer = ResponseNormalizer()
+    private val normalizer = ResponseNormalizer()
 
-    // Requirement 5.4, 12.1 — classificação válida é preservada
-    "deve retornar FALSE_POSITIVE para string válida FALSE_POSITIVE" {
-        normalizer.normalizeClassification("FALSE_POSITIVE") shouldBe Classification.FALSE_POSITIVE
+    @Test
+    @DisplayName("deve retornar FALSE_POSITIVE para string válida FALSE_POSITIVE")
+    fun shouldReturnFalsePositiveForValidString() {
+        assertEquals(Classification.FALSE_POSITIVE, normalizer.normalizeClassification("FALSE_POSITIVE"))
     }
 
-    "deve retornar SUSPICIOUS para string válida SUSPICIOUS" {
-        normalizer.normalizeClassification("SUSPICIOUS") shouldBe Classification.SUSPICIOUS
+    @Test
+    @DisplayName("deve retornar SUSPICIOUS para string válida SUSPICIOUS")
+    fun shouldReturnSuspiciousForValidString() {
+        assertEquals(Classification.SUSPICIOUS, normalizer.normalizeClassification("SUSPICIOUS"))
     }
 
-    "deve retornar UNCERTAIN para string válida UNCERTAIN" {
-        normalizer.normalizeClassification("UNCERTAIN") shouldBe Classification.UNCERTAIN
+    @Test
+    @DisplayName("deve retornar UNCERTAIN para string válida UNCERTAIN")
+    fun shouldReturnUncertainForValidString() {
+        assertEquals(Classification.UNCERTAIN, normalizer.normalizeClassification("UNCERTAIN"))
     }
 
-    // Requirement 5.4, 12.2 — classificação inválida retorna UNCERTAIN
-    "deve retornar UNCERTAIN para classificação inválida" {
-        normalizer.normalizeClassification("INVALID_VALUE") shouldBe Classification.UNCERTAIN
+    @Test
+    @DisplayName("deve retornar UNCERTAIN para classificação inválida")
+    fun shouldReturnUncertainForInvalidClassification() {
+        assertEquals(Classification.UNCERTAIN, normalizer.normalizeClassification("INVALID_VALUE"))
     }
 
-    "deve retornar UNCERTAIN para string vazia" {
-        normalizer.normalizeClassification("") shouldBe Classification.UNCERTAIN
+    @Test
+    @DisplayName("deve retornar UNCERTAIN para string vazia")
+    fun shouldReturnUncertainForEmptyString() {
+        assertEquals(Classification.UNCERTAIN, normalizer.normalizeClassification(""))
     }
 
-    // Requirement 12.10 — classificação nula retorna UNCERTAIN
-    "deve retornar UNCERTAIN para classificação nula" {
-        normalizer.normalizeClassification(null) shouldBe Classification.UNCERTAIN
+    @Test
+    @DisplayName("deve retornar UNCERTAIN para classificação nula")
+    fun shouldReturnUncertainForNullClassification() {
+        assertEquals(Classification.UNCERTAIN, normalizer.normalizeClassification(null))
     }
 
-    // Requirement 5.5, 12.1 — confidence dentro do range é preservada
-    "deve preservar confidence dentro do range válido" {
-        normalizer.normalizeConfidence(0.85) shouldBe 0.85
+    @Test
+    @DisplayName("deve preservar confidence dentro do range válido")
+    fun shouldPreserveConfidenceInValidRange() {
+        assertEquals(0.85, normalizer.normalizeConfidence(0.85))
     }
 
-    "deve preservar confidence zero" {
-        normalizer.normalizeConfidence(0.00) shouldBe 0.00
+    @Test
+    @DisplayName("deve preservar confidence zero")
+    fun shouldPreserveConfidenceZero() {
+        assertEquals(0.00, normalizer.normalizeConfidence(0.00))
     }
 
-    "deve preservar confidence um" {
-        normalizer.normalizeConfidence(1.00) shouldBe 1.00
+    @Test
+    @DisplayName("deve preservar confidence um")
+    fun shouldPreserveConfidenceOne() {
+        assertEquals(1.00, normalizer.normalizeConfidence(1.00))
     }
 
-    // Requirement 5.5, 12.2 — confidence fora do range é clamped
-    "deve fazer clamp de confidence acima de 1.0 para 1.0" {
-        normalizer.normalizeConfidence(1.5) shouldBe 1.00
+    @Test
+    @DisplayName("deve fazer clamp de confidence acima de 1.0 para 1.0")
+    fun shouldClampConfidenceAboveOne() {
+        assertEquals(1.00, normalizer.normalizeConfidence(1.5))
     }
 
-    "deve fazer clamp de confidence negativa para 0.0" {
-        normalizer.normalizeConfidence(-0.5) shouldBe 0.00
+    @Test
+    @DisplayName("deve fazer clamp de confidence negativa para 0.0")
+    fun shouldClampNegativeConfidence() {
+        assertEquals(0.00, normalizer.normalizeConfidence(-0.5))
     }
 
-    // Requirement 12.10 — confidence nula retorna 0.00
-    "deve retornar 0.00 para confidence nula" {
-        normalizer.normalizeConfidence(null) shouldBe 0.00
+    @Test
+    @DisplayName("deve retornar 0.00 para confidence nula")
+    fun shouldReturnZeroForNullConfidence() {
+        assertEquals(0.00, normalizer.normalizeConfidence(null))
     }
-})
+}

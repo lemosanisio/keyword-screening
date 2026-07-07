@@ -3,9 +3,11 @@ package br.com.screening.integration
 import br.com.screening.application.usecase.EvaluateKeywordScreeningCommand
 import br.com.screening.application.usecase.EvaluateKeywordScreeningResult
 import br.com.screening.application.usecase.EvaluateKeywordScreeningUseCase
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.shouldBe
+import br.com.shared.domain.valueobject.CustomerId
+import br.com.shared.domain.valueobject.TransactionId
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
@@ -19,10 +21,13 @@ import java.util.concurrent.Executors
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-class RaceConditionIntegrationTest(
-    @Autowired private val useCase: EvaluateKeywordScreeningUseCase,
-    @Autowired private val jdbcTemplate: JdbcTemplate
-) : StringSpec() {
+class RaceConditionIntegrationTest {
+
+    @Autowired
+    private lateinit var useCase: EvaluateKeywordScreeningUseCase
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     companion object {
         @Container
@@ -41,47 +46,37 @@ class RaceConditionIntegrationTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
+    @Test
+    @DisplayName("concurrent calls with same transactionId produce only 1 rule_execution and identical results")
+    fun concurrentCallsProduceOneRecord() {
+        val transactionId = "txn-race-condition-001"
+        val description = "Operacao de terrorismo financeiro"
 
-    init {
-        "concurrent calls with same transactionId produce only 1 rule_execution and identical results" {
-            val transactionId = "txn-race-condition-001"
-            val description = "Operacao de terrorismo financeiro"
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val command = EvaluateKeywordScreeningCommand(
+                transactionId = TransactionId(transactionId),
+                customerId = CustomerId("CUST-RACE-001"),
+                description = description
+            )
 
-            val executor = Executors.newFixedThreadPool(2)
-            try {
-                val command = EvaluateKeywordScreeningCommand(
-                    transactionId = transactionId,
-                    description = description
-                )
+            val future1 = CompletableFuture.supplyAsync({ useCase.execute(command) }, executor)
+            val future2 = CompletableFuture.supplyAsync({ useCase.execute(command) }, executor)
 
-                val future1 = CompletableFuture.supplyAsync({
-                    useCase.execute(command)
-                }, executor)
+            val result1: EvaluateKeywordScreeningResult = future1.get()
+            val result2: EvaluateKeywordScreeningResult = future2.get()
 
-                val future2 = CompletableFuture.supplyAsync({
-                    useCase.execute(command)
-                }, executor)
+            assertEquals(result1.ruleCode, result2.ruleCode)
+            assertEquals(result1.matched, result2.matched)
+            assertEquals(result1.matches, result2.matches)
 
-                val result1: EvaluateKeywordScreeningResult = future1.get()
-                val result2: EvaluateKeywordScreeningResult = future2.get()
-
-                // Both threads get the same ScreeningResult
-                result1.ruleCode shouldBe result2.ruleCode
-                result1.matched shouldBe result2.matched
-                result1.matches shouldBe result2.matches
-
-                // Only 1 rule_execution record exists (UNIQUE constraint)
-                val count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM rule_execution WHERE transaction_id = ? AND rule_code = ?",
-                    Long::class.java,
-                    transactionId,
-                    "KEYWORD_SCREENING"
-                )
-                count shouldBe 1L
-            } finally {
-                executor.shutdown()
-            }
+            val count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rule_execution WHERE transaction_id = ? AND rule_code = ?",
+                Long::class.java, transactionId, "KEYWORD_SCREENING"
+            )
+            assertEquals(1L, count)
+        } finally {
+            executor.shutdown()
         }
     }
 }

@@ -1,11 +1,11 @@
 package br.com.screening.integration
 
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
@@ -19,10 +19,13 @@ import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ContextualScreeningEndToEndTest(
-    @Autowired private val restTemplate: TestRestTemplate,
-    @Autowired private val jdbcTemplate: JdbcTemplate
-) : StringSpec() {
+class ContextualScreeningEndToEndTest {
+
+    @Autowired
+    private lateinit var restTemplate: TestRestTemplate
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     companion object {
         val postgres = PostgreSQLContainer("postgres:16-alpine")
@@ -47,8 +50,6 @@ class ContextualScreeningEndToEndTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
-
     private fun buildEvaluateRequest(transactionId: String, description: String, matchedKeyword: String): HttpEntity<String> {
         val requestBody = """
             {
@@ -57,10 +58,7 @@ class ContextualScreeningEndToEndTest(
                 "matchedKeyword": "$matchedKeyword"
             }
         """.trimIndent()
-
-        val headers = HttpHeaders().apply {
-            contentType = MediaType.APPLICATION_JSON
-        }
+        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
         return HttpEntity(requestBody, headers)
     }
 
@@ -76,156 +74,116 @@ class ContextualScreeningEndToEndTest(
                 "timestamp": "2024-01-15T14:30:00.000Z"
             }
         """.trimIndent()
-
         mockWebServer.enqueue(
-            MockResponse()
-                .setBody(responseJson)
-                .addHeader("Content-Type", "application/json")
+            MockResponse().setBody(responseJson).addHeader("Content-Type", "application/json")
         )
     }
 
-    init {
-        "POST evaluate with NAO_COMUNICAR response should return 200 with FALSE_POSITIVE classification" {
-            enqueueLlmResponse("NAO_COMUNICAR", 0.97, "Operação compatível com perfil do cliente")
+    @Test
+    @DisplayName("POST evaluate with NAO_COMUNICAR response should return 200 with FALSE_POSITIVE classification")
+    fun evaluateWithNaoComunicarReturnsFalsePositive() {
+        enqueueLlmResponse("NAO_COMUNICAR", 0.97, "Operação compatível com perfil do cliente")
 
-            val entity = buildEvaluateRequest(
-                transactionId = "txn-ctx-e2e-001",
-                description = "Pagamento de aluguel mensal referente terrorismo residencial",
-                matchedKeyword = "terrorismo"
-            )
+        val entity = buildEvaluateRequest(
+            transactionId = "txn-ctx-e2e-001",
+            description = "Pagamento de aluguel mensal referente terrorismo residencial",
+            matchedKeyword = "terrorismo"
+        )
 
-            val response = restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+        val response = restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
 
-            response.statusCode shouldBe HttpStatus.OK
-            response.body shouldNotBe null
-            response.body!!["classification"] shouldBe "FALSE_POSITIVE"
-            response.body!!["confidence"] shouldBe 0.97
-            response.body!!["reason"] shouldBe "Operação compatível com perfil do cliente"
-            response.body!!["requiresAnalystReview"] shouldBe false
-        }
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertNotNull(response.body)
+        assertEquals("FALSE_POSITIVE", response.body!!["classification"])
+        assertEquals(0.97, response.body!!["confidence"])
+        assertEquals("Operação compatível com perfil do cliente", response.body!!["reason"])
+        assertEquals(false, response.body!!["requiresAnalystReview"])
+    }
 
-        "POST evaluate with COMUNICAR response should return 200 with SUSPICIOUS classification" {
-            enqueueLlmResponse("COMUNICAR", 0.92, "Indícios de atividade suspeita")
+    @Test
+    @DisplayName("POST evaluate with COMUNICAR response should return 200 with SUSPICIOUS classification")
+    fun evaluateWithComunicarReturnsSuspicious() {
+        enqueueLlmResponse("COMUNICAR", 0.92, "Indícios de atividade suspeita")
 
-            val entity = buildEvaluateRequest(
-                transactionId = "txn-ctx-e2e-002",
-                description = "Transferência internacional para país com lavagem de dinheiro",
-                matchedKeyword = "lavagem"
-            )
+        val entity = buildEvaluateRequest(
+            transactionId = "txn-ctx-e2e-002",
+            description = "Transferência internacional para país com lavagem de dinheiro",
+            matchedKeyword = "lavagem"
+        )
 
-            val response = restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+        val response = restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
 
-            response.statusCode shouldBe HttpStatus.OK
-            response.body shouldNotBe null
-            response.body!!["classification"] shouldBe "SUSPICIOUS"
-            response.body!!["requiresAnalystReview"] shouldBe true
-        }
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertNotNull(response.body)
+        assertEquals("SUSPICIOUS", response.body!!["classification"])
+        assertEquals(true, response.body!!["requiresAnalystReview"])
+    }
 
-        "idempotency: second call with same transactionId returns identical result without invoking LLM again" {
-            val transactionId = "txn-ctx-idempotent-001"
+    @Test
+    @DisplayName("idempotency: second call with same transactionId returns identical result without invoking LLM again")
+    fun idempotencyWithoutInvokingLlmAgain() {
+        val transactionId = "txn-ctx-idempotent-001"
 
-            // Enqueue only ONE response — if LLM is called twice, second call will fail
-            enqueueLlmResponse("NAO_COMUNICAR", 0.98, "Falso positivo identificado")
+        enqueueLlmResponse("NAO_COMUNICAR", 0.98, "Falso positivo identificado")
 
-            val entity = buildEvaluateRequest(
-                transactionId = transactionId,
-                description = "Compra em loja com nome suspeito de fraude",
-                matchedKeyword = "fraude"
-            )
+        val entity = buildEvaluateRequest(
+            transactionId = transactionId,
+            description = "Compra em loja com nome suspeito de fraude",
+            matchedKeyword = "fraude"
+        )
 
-            val response1 = restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+        val response1 = restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
+        val response2 = restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
 
-            val response2 = restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+        assertEquals(HttpStatus.OK, response1.statusCode)
+        assertEquals(HttpStatus.OK, response2.statusCode)
+        assertEquals(response1.body, response2.body)
+        assertEquals("FALSE_POSITIVE", response2.body!!["classification"])
+        assertEquals(0.98, response2.body!!["confidence"])
+    }
 
-            response1.statusCode shouldBe HttpStatus.OK
-            response2.statusCode shouldBe HttpStatus.OK
-            response1.body shouldBe response2.body
+    @Test
+    @DisplayName("only 1 contextual_screening_audit record exists after 2 calls with same transactionId")
+    fun onlyOneAuditRecordAfterTwoCalls() {
+        val transactionId = "txn-ctx-single-record-001"
 
-            // The fact that response2 succeeds with identical body proves idempotency works.
-            // Only 1 MockWebServer response was enqueued; if the second call hit LLM, it would
-            // either get a different response or an error.
-            response2.body!!["classification"] shouldBe "FALSE_POSITIVE"
-            response2.body!!["confidence"] shouldBe 0.98
-        }
+        enqueueLlmResponse("REVISAO_MANUAL", 0.50, "Análise inconclusiva")
 
-        "only 1 contextual_screening_audit record exists after 2 calls with same transactionId" {
-            val transactionId = "txn-ctx-single-record-001"
+        val entity = buildEvaluateRequest(
+            transactionId = transactionId,
+            description = "Operação com termos ambíguos de corrupção",
+            matchedKeyword = "corrupção"
+        )
 
-            enqueueLlmResponse("REVISAO_MANUAL", 0.50, "Análise inconclusiva")
+        restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
+        restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
 
-            val entity = buildEvaluateRequest(
-                transactionId = transactionId,
-                description = "Operação com termos ambíguos de corrupção",
-                matchedKeyword = "corrupção"
-            )
+        val count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
+            Long::class.java, transactionId, "CONTEXTUAL_SCREENING"
+        )
+        assertEquals(1L, count)
+    }
 
-            restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+    @Test
+    @DisplayName("MockWebServer received only 1 request for idempotent call flow")
+    fun mockWebServerReceivedOnlyOneRequest() {
+        val transactionId = "txn-ctx-verify-single-llm-call-001"
 
-            restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
+        enqueueLlmResponse("NAO_COMUNICAR", 0.96, "Transação normal")
 
-            val count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
-                Long::class.java,
-                transactionId,
-                "CONTEXTUAL_SCREENING"
-            )
+        val entity = buildEvaluateRequest(
+            transactionId = transactionId,
+            description = "Depósito referente a financiamento imobiliário",
+            matchedKeyword = "financiamento"
+        )
 
-            count shouldBe 1L
-        }
+        val requestCountBefore = mockWebServer.requestCount
 
-        "MockWebServer received only 1 request for idempotent call flow" {
-            val transactionId = "txn-ctx-verify-single-llm-call-001"
+        restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
+        restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
 
-            enqueueLlmResponse("NAO_COMUNICAR", 0.96, "Transação normal")
-
-            val entity = buildEvaluateRequest(
-                transactionId = transactionId,
-                description = "Depósito referente a financiamento imobiliário",
-                matchedKeyword = "financiamento"
-            )
-
-            // Track request count before our calls
-            val requestCountBefore = mockWebServer.requestCount
-
-            restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
-
-            restTemplate.postForEntity(
-                "/v1/rules/contextual-screening/evaluate",
-                entity,
-                Map::class.java
-            )
-
-            // Should have received exactly 1 additional request (only first call hits LLM)
-            val requestCountAfter = mockWebServer.requestCount
-            (requestCountAfter - requestCountBefore) shouldBe 1
-        }
+        val requestCountAfter = mockWebServer.requestCount
+        assertEquals(1, requestCountAfter - requestCountBefore)
     }
 }

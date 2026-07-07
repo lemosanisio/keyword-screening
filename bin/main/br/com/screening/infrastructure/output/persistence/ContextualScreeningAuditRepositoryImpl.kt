@@ -5,6 +5,7 @@ import br.com.screening.domain.model.ContextualScreeningAudit
 import br.com.screening.domain.port.ContextualScreeningAuditRepository
 import br.com.screening.infrastructure.output.persistence.mapper.ContextualScreeningAuditMapper
 import br.com.screening.infrastructure.output.persistence.repository.ContextualScreeningAuditJpaRepository
+import br.com.shared.domain.valueobject.TransactionId
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Repository
 
@@ -14,8 +15,8 @@ class ContextualScreeningAuditRepositoryImpl(
     private val mapper: ContextualScreeningAuditMapper
 ) : ContextualScreeningAuditRepository {
 
-    override fun findByTransactionIdAndRuleId(transactionId: String, ruleId: String): ContextualScreeningAudit? =
-        jpaRepository.findByTransactionIdAndRuleId(transactionId, ruleId)?.let(mapper::toDomain)
+    override fun findByTransactionIdAndRuleId(transactionId: TransactionId, ruleId: String): ContextualScreeningAudit? =
+        jpaRepository.findByTransactionIdAndRuleId(transactionId.value, ruleId)?.let(mapper::toDomain)
 
     override fun save(audit: ContextualScreeningAudit): ContextualScreeningAudit =
         try {
@@ -26,7 +27,7 @@ class ContextualScreeningAuditRepositoryImpl(
             findByTransactionIdAndRuleId(audit.transactionId, audit.ruleId) ?: throw e
         }
 
-    override fun updateAnalystDecision(transactionId: String, ruleId: String, decision: Classification) {
-        jpaRepository.updateAnalystDecision(transactionId, ruleId, decision.name)
+    override fun updateAnalystDecision(transactionId: TransactionId, ruleId: String, decision: Classification) {
+        jpaRepository.updateAnalystDecision(transactionId.value, ruleId, decision.name)
     }
 }

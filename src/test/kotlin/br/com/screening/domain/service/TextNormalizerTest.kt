@@ -1,38 +1,44 @@
 package br.com.screening.domain.service
 
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 
 /**
  * Testes unitários para [TextNormalizer] — exemplos concretos.
  * Requirements: 2.1–2.5
  */
-class TextNormalizerTest : StringSpec({
+class TextNormalizerTest {
 
-    val normalizer = TextNormalizer()
+    private val normalizer = TextNormalizer()
 
-    // Requirement 2.1 — texto convertido para minúsculas
-    "deve converter texto maiúsculo para minúsculas" {
-        normalizer.normalize("Lavagem") shouldBe "lavagem"
+    @Test
+    @DisplayName("deve converter texto maiúsculo para minúsculas")
+    fun shouldConvertUppercaseToLowercase() {
+        assertEquals("lavagem", normalizer.normalize("Lavagem"))
     }
 
-    // Requirement 2.2 — acentos removidos
-    "deve remover acentos de palavras acentuadas" {
-        normalizer.normalize("café") shouldBe "cafe"
+    @Test
+    @DisplayName("deve remover acentos de palavras acentuadas")
+    fun shouldRemoveAccents() {
+        assertEquals("cafe", normalizer.normalize("café"))
     }
 
-    // Requirements 2.3 — caracteres especiais removidos
-    "deve remover caracteres especiais como cifrão, vírgula e ponto" {
-        normalizer.normalize("R\$100,00") shouldBe "r10000"
+    @Test
+    @DisplayName("deve remover caracteres especiais como cifrão, vírgula e ponto")
+    fun shouldRemoveSpecialCharacters() {
+        assertEquals("r10000", normalizer.normalize("R\$100,00"))
     }
 
-    // Requirement 2.4 — espaços múltiplos compactados e trim aplicado
-    "deve compactar múltiplos espaços e remover espaços nas bordas" {
-        normalizer.normalize("  dois  espaços  ") shouldBe "dois espacos"
+    @Test
+    @DisplayName("deve compactar múltiplos espaços e remover espaços nas bordas")
+    fun shouldCompactMultipleSpacesAndTrim() {
+        assertEquals("dois espacos", normalizer.normalize("  dois  espaços  "))
     }
 
-    // Requirement 2.5 — string vazia retorna string vazia
-    "deve retornar string vazia para entrada vazia" {
-        normalizer.normalize("") shouldBe ""
+    @Test
+    @DisplayName("deve retornar string vazia para entrada vazia")
+    fun shouldReturnEmptyStringForEmptyInput() {
+        assertEquals("", normalizer.normalize(""))
     }
-})
+}

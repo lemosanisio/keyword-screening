@@ -17,7 +17,19 @@ Identificar termos restritos em descrições de transações financeiras (PIX), 
 Primeira camada de detecção: busca por termos restritos pré-cadastrados na descrição da transação. Resposta binária (matched/not matched) com lista de termos encontrados.
 
 ### Contextual Screening
-Segunda camada (em desenvolvimento): usa LLM para análise contextual, reduzindo falsos positivos do Keyword Screening. Integra com API externa (coaf-analyzer) para decisão sobre comunicação ao COAF.
+Segunda camada: usa LLM para análise contextual, reduzindo falsos positivos do Keyword Screening. Integra com API externa (coaf-analyzer) para decisão sobre comunicação ao COAF.
+
+### Decision Engine (Rule Platform)
+Plataforma de decisão para regras de PLD. Desacopla a lógica de geração de alertas da execução dos algoritmos de screening. Suporta múltiplas regras, múltiplos contextos e múltiplas fontes de fatos. Inclui:
+- Catálogo de regras e configurações editáveis pelo analista
+- Registry de entidades e fatos tipados
+- Context Builder com Fact Resolvers especializados
+- Expression Evaluator para condições e grupos lógicos
+- Persistência de execuções com explicação estruturada (explainability)
+- Dry-Run para teste de configurações antes da publicação
+
+### Alert
+Bounded context downstream: geração de alertas pós-decisão, com ciclo de vida (status) e consulta.
 
 ## Domínio
 

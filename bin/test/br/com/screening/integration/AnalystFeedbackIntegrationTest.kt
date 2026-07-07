@@ -1,11 +1,11 @@
 package br.com.screening.integration
 
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
@@ -24,10 +24,13 @@ import org.testcontainers.containers.PostgreSQLContainer
  * Validates: Requirements 8.1, 8.2, 8.3, 8.4
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class AnalystFeedbackIntegrationTest(
-    @Autowired private val restTemplate: TestRestTemplate,
-    @Autowired private val jdbcTemplate: JdbcTemplate
-) : StringSpec() {
+class AnalystFeedbackIntegrationTest {
+
+    @Autowired
+    private lateinit var restTemplate: TestRestTemplate
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     companion object {
         val postgres = PostgreSQLContainer("postgres:16-alpine")
@@ -52,8 +55,6 @@ class AnalystFeedbackIntegrationTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
-
     private fun enqueueLlmResponse(decisao: String, confianca: Double, justificativa: String) {
         val responseJson = """
             {
@@ -66,11 +67,8 @@ class AnalystFeedbackIntegrationTest(
                 "timestamp": "2024-01-15T14:30:00.000Z"
             }
         """.trimIndent()
-
         mockWebServer.enqueue(
-            MockResponse()
-                .setBody(responseJson)
-                .addHeader("Content-Type", "application/json")
+            MockResponse().setBody(responseJson).addHeader("Content-Type", "application/json")
         )
     }
 
@@ -84,16 +82,11 @@ class AnalystFeedbackIntegrationTest(
                 "matchedKeyword": "$keyword"
             }
         """.trimIndent()
-
         val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
         val entity = HttpEntity(requestBody, headers)
 
-        val response = restTemplate.postForEntity(
-            "/v1/rules/contextual-screening/evaluate",
-            entity,
-            Map::class.java
-        )
-        response.statusCode shouldBe HttpStatus.OK
+        val response = restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
+        assertEquals(HttpStatus.OK, response.statusCode)
     }
 
     private fun postDecision(transactionId: String, analystDecision: String): org.springframework.http.ResponseEntity<Map<*, *>> {
@@ -103,81 +96,63 @@ class AnalystFeedbackIntegrationTest(
                 "analystDecision": "$analystDecision"
             }
         """.trimIndent()
-
         val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
         val entity = HttpEntity(requestBody, headers)
 
-        return restTemplate.postForEntity(
-            "/v1/rules/contextual-screening/decisions",
-            entity,
-            Map::class.java
-        )
+        return restTemplate.postForEntity("/v1/rules/contextual-screening/decisions", entity, Map::class.java)
     }
 
-    init {
-        "POST decisions persists HistoricalDecision and updates analystDecision in audit - Req 8.1, 8.3" {
-            val transactionId = "txn-feedback-001"
-            val keyword = "terrorismo"
+    @Test
+    @DisplayName("POST decisions persists HistoricalDecision and updates analystDecision in audit - Req 8.1, 8.3")
+    fun decisionPersistsAndUpdatesAudit() {
+        val transactionId = "txn-feedback-001"
+        val keyword = "terrorismo"
 
-            // Step 1: Create audit via /evaluate
-            createAuditViaEvaluate(transactionId, keyword)
+        createAuditViaEvaluate(transactionId, keyword)
+        val response = postDecision(transactionId, "FALSE_POSITIVE")
 
-            // Step 2: Submit analyst decision
-            val response = postDecision(transactionId, "FALSE_POSITIVE")
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertNotNull(response.body)
+        assertEquals(transactionId, response.body!!["transactionId"])
+        assertEquals("FALSE_POSITIVE", response.body!!["analystDecision"])
 
-            // Step 3: Verify HTTP 200
-            response.statusCode shouldBe HttpStatus.OK
-            response.body shouldNotBe null
-            response.body!!["transactionId"] shouldBe transactionId
-            response.body!!["analystDecision"] shouldBe "FALSE_POSITIVE"
+        val historicalCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM historical_decision WHERE keyword = ? AND analyst_decision = ?",
+            Long::class.java, keyword, "FALSE_POSITIVE"
+        )
+        assertNotNull(historicalCount)
+        assertEquals(1L, historicalCount)
 
-            // Step 4: Verify HistoricalDecision was created in DB
-            val historicalCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM historical_decision WHERE keyword = ? AND analyst_decision = ?",
-                Long::class.java,
-                keyword,
-                "FALSE_POSITIVE"
-            )
-            historicalCount shouldNotBe null
-            historicalCount!! shouldBe 1L
+        val analystDecisionInAudit = jdbcTemplate.queryForObject(
+            "SELECT analyst_decision FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
+            String::class.java, transactionId, "CONTEXTUAL_SCREENING"
+        )
+        assertEquals("FALSE_POSITIVE", analystDecisionInAudit)
+    }
 
-            // Step 5: Verify audit.analystDecision was updated
-            val analystDecisionInAudit = jdbcTemplate.queryForObject(
-                "SELECT analyst_decision FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
-                String::class.java,
-                transactionId,
-                "CONTEXTUAL_SCREENING"
-            )
-            analystDecisionInAudit shouldBe "FALSE_POSITIVE"
-        }
+    @Test
+    @DisplayName("HistoricalDecision is retrievable by keyword after analyst feedback - Req 8.2")
+    fun historicalDecisionRetrievableByKeyword() {
+        val transactionId = "txn-feedback-002"
+        val keyword = "lavagem"
 
-        "HistoricalDecision is retrievable by keyword after analyst feedback - Req 8.2" {
-            val transactionId = "txn-feedback-002"
-            val keyword = "lavagem"
+        createAuditViaEvaluate(transactionId, keyword)
+        val response = postDecision(transactionId, "SUSPICIOUS")
+        assertEquals(HttpStatus.OK, response.statusCode)
 
-            // Step 1: Create audit via /evaluate
-            createAuditViaEvaluate(transactionId, keyword)
+        val decisions = jdbcTemplate.queryForList(
+            "SELECT keyword, analyst_decision FROM historical_decision WHERE keyword = ? ORDER BY created_at DESC",
+            keyword
+        )
+        assertEquals(1, decisions.size)
+        assertEquals(keyword, decisions[0]["keyword"])
+        assertEquals("SUSPICIOUS", decisions[0]["analyst_decision"])
+    }
 
-            // Step 2: Submit analyst decision
-            val response = postDecision(transactionId, "SUSPICIOUS")
-            response.statusCode shouldBe HttpStatus.OK
-
-            // Step 3: Verify HistoricalDecision is retrievable by keyword
-            val decisions = jdbcTemplate.queryForList(
-                "SELECT keyword, analyst_decision FROM historical_decision WHERE keyword = ? ORDER BY created_at DESC",
-                keyword
-            )
-            decisions.size shouldBe 1
-            decisions[0]["keyword"] shouldBe keyword
-            decisions[0]["analyst_decision"] shouldBe "SUSPICIOUS"
-        }
-
-        "POST decisions with non-existent transactionId returns 404 - Req 8.4" {
-            val nonExistentTransactionId = "txn-non-existent-999"
-
-            val response = postDecision(nonExistentTransactionId, "FALSE_POSITIVE")
-
-            response.statusCode shouldBe HttpStatus.NOT_FOUND
-        }
+    @Test
+    @DisplayName("POST decisions with non-existent transactionId returns 404 - Req 8.4")
+    fun nonExistentTransactionIdReturns404() {
+        val response = postDecision("txn-non-existent-999", "FALSE_POSITIVE")
+        assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
     }
 }

@@ -30,7 +30,7 @@ class AnalystDecisionService(
 
         // 2. Buscar audit existente
         val audit = auditRepository.findByTransactionIdAndRuleId(command.transactionId, command.ruleId)
-            ?: throw AuditNotFoundException(command.transactionId, command.ruleId)
+            ?: throw AuditNotFoundException(command.transactionId.value, command.ruleId)
 
         // 3. Persistir HistoricalDecision para RAG futuro
         val historicalDecision = HistoricalDecision(
@@ -45,7 +45,7 @@ class AnalystDecisionService(
         auditRepository.updateAnalystDecision(command.transactionId, command.ruleId, decision)
 
         return AnalystDecisionResultDto(
-            transactionId = command.transactionId,
+            transactionId = command.transactionId.value,
             ruleId = command.ruleId,
             analystDecision = decision.name,
             registeredAt = Instant.now().toString()

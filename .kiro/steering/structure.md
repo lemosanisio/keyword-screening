@@ -4,14 +4,38 @@
 
 Hexagonal Architecture (Ports & Adapters) com DDD. `infrastructure` = tudo que está fora do hexágono.
 
+Múltiplos bounded contexts coexistem no mesmo JVM (ver ADR-006): `screening` (principal), `decision` (plataforma de regras), e `alert` (geração de alertas pós-decisão).
+
 ## Layout de Pacotes
 
 ```
 br.com
 ├── shared/                              # Compartilhado entre todos os contextos
-│   └── domain/                          # DomainException (base para 422)
+│   └── domain/                          # DomainException, DomainEvent, DomainEventPublisher
+│       └── valueobject/                 # Value objects compartilhados
 │
-└── screening/                           # Contexto de screening
+├── alert/                               # Bounded context: alertas pós-decisão
+│   ├── domain/                          # Modelo de Alert, status, ports
+│   ├── application/                     # Use cases de criação/consulta de alertas
+│   └── infrastructure/                  # Controllers, persistência, listeners de eventos
+│
+├── decision/                            # Bounded context: plataforma de decisão/regras
+│   ├── domain/                          # Modelo de regras, fatos, expressões, resolvers
+│   │   ├── model/                       # DecisionExecution, RuleDefinition, Expression, etc.
+│   │   ├── event/                       # Eventos de decisão
+│   │   ├── exception/                   # Exceções de domínio
+│   │   ├── port/                        # Output ports (driven)
+│   │   ├── resolver/                    # Fact Resolver interfaces
+│   │   └── service/                     # Domain services (Rule Engine, Expression Evaluator)
+│   ├── application/                     # Use cases: ExecuteDecision, DryRun, ManageRuleConfig
+│   │   ├── usecase/                     # Input port interfaces + Commands + Results
+│   │   └── service/                     # Implementações dos use cases
+│   └── infrastructure/                  # Adapters REST, persistência, configuração
+│       ├── input/                       # Controllers HTTP
+│       ├── output/                      # JPA, resolvers concretos
+│       └── configuration/              # @Configuration beans
+│
+└── screening/                           # Contexto principal de screening
     ├── domain/                          # Núcleo — zero dependências de framework
     │   ├── model/                       # Entidades, value objects, enums
     │   ├── exception/                   # Exceções de domínio específicas do contexto
@@ -55,6 +79,8 @@ br.com
 | Mapper | `Substantivo + Mapper` | `RestrictedTermMapper` |
 | Port (output interface) | `Substantivo + Port` ou `Substantivo + Repository` | `LlmClassifierPort` |
 | Adapter (impl) | `Substantivo + Adapter` | `CoafAnalyzerAdapter` |
+| Domain Event | `Substantivo + Event` | `DecisionMadeEvent` |
+| Fact Resolver | `Substantivo + Resolver` | `CustomerResolver` |
 
 ## Testes — Organização
 
@@ -70,8 +96,7 @@ src/test/kotlin/br/com/screening/
 │       ├── llm/                                 # Adapter tests (MockWebServer)
 │       ├── persistence/mapper/                  # Mapper tests
 │       └── scheduler/                           # Scheduler tests
-├── integration/                                 # End-to-end com Testcontainers
-└── KotestConfig.kt                              # Configuração global Kotest (PBT 1000 iterações)
+└── integration/                                 # End-to-end com Testcontainers
 ```
 
 ## Regras de Dependência
@@ -83,3 +108,4 @@ src/test/kotlin/br/com/screening/
 - `infrastructure/input` depende de `application` (use cases), nunca de `infrastructure/output`
 - DTOs de request/response ficam em `infrastructure/input/http/dto`, NUNCA no domínio
 - `@ConfigurationProperties` em `infrastructure/configuration` para configurações tipadas
+- Comunicação entre bounded contexts via Spring Application Events (ver ADR-002)

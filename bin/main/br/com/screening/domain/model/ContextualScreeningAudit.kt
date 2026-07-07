@@ -1,5 +1,6 @@
 package br.com.screening.domain.model
 
+import br.com.shared.domain.valueobject.TransactionId
 import java.time.Instant
 
 /**
@@ -7,7 +8,7 @@ import java.time.Instant
  */
 data class ContextualScreeningAudit(
     val id: Long? = null,
-    val transactionId: String,
+    val transactionId: TransactionId,
     val ruleId: String,
     val keyword: String,
     val prompt: String,

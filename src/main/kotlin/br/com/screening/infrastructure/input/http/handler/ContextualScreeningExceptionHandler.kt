@@ -13,7 +13,7 @@ import java.time.Instant
  * Handler específico do contexto Contextual Screening.
  * Trata exceções que mapeiam para status codes diferentes de 422.
  */
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = ["br.com.screening.infrastructure.input.http"])
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ContextualScreeningExceptionHandler {
 

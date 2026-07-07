@@ -4,6 +4,7 @@ import br.com.screening.domain.model.RuleExecution
 import br.com.screening.domain.repository.RuleExecutionRepository
 import br.com.screening.infrastructure.output.persistence.mapper.RuleExecutionMapper
 import br.com.screening.infrastructure.output.persistence.repository.RuleExecutionJpaRepository
+import br.com.shared.domain.valueobject.TransactionId
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Repository
 
@@ -12,8 +13,8 @@ class RuleExecutionRepositoryImpl(
     private val jpaRepository: RuleExecutionJpaRepository,
     private val mapper: RuleExecutionMapper
 ) : RuleExecutionRepository {
-    override fun findByTransactionIdAndRuleCode(transactionId: String, ruleCode: String): RuleExecution? =
-        jpaRepository.findByTransactionIdAndRuleCode(transactionId, ruleCode)?.let { mapper.toDomain(it) }
+    override fun findByTransactionIdAndRuleCode(transactionId: TransactionId, ruleCode: String): RuleExecution? =
+        jpaRepository.findByTransactionIdAndRuleCode(transactionId.value, ruleCode)?.let { mapper.toDomain(it) }
 
     override fun save(ruleExecution: RuleExecution): RuleExecution {
         return try {
@@ -23,7 +24,7 @@ class RuleExecutionRepositoryImpl(
         } catch (ex: DataIntegrityViolationException) {
             // Race condition: another thread persisted first
             val existing = jpaRepository.findByTransactionIdAndRuleCode(
-                ruleExecution.transactionId, ruleExecution.ruleCode
+                ruleExecution.transactionId.value, ruleExecution.ruleCode
             )
             existing?.let { mapper.toDomain(it) } ?: throw ex
         }

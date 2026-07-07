@@ -1,11 +1,11 @@
 package br.com.screening.integration
 
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.extensions.spring.SpringExtension
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
@@ -24,17 +24,16 @@ import java.util.concurrent.Executors
  * Integration test verifying that concurrent calls with the same transactionId/ruleId
  * produce only one audit record in the database (UNIQUE constraint) and return identical results.
  *
- * The ContextualScreeningAuditRepositoryImpl handles DataIntegrityViolationException by
- * catching the exception and falling back to findByTransactionIdAndRuleId, ensuring that
- * race conditions on concurrent inserts are gracefully handled.
- *
- * **Validates: Requirement 9.3**
+ * Validates: Requirement 9.3
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ContextualScreeningRaceConditionIntegrationTest(
-    @Autowired private val restTemplate: TestRestTemplate,
-    @Autowired private val jdbcTemplate: JdbcTemplate
-) : StringSpec() {
+class ContextualScreeningRaceConditionIntegrationTest {
+
+    @Autowired
+    private lateinit var restTemplate: TestRestTemplate
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     companion object {
         val postgres = PostgreSQLContainer("postgres:16-alpine")
@@ -60,94 +59,74 @@ class ContextualScreeningRaceConditionIntegrationTest(
         }
     }
 
-    override fun extensions() = listOf(SpringExtension)
+    @Test
+    @DisplayName("concurrent calls with same transactionId/ruleId produce only 1 audit record and identical results")
+    fun concurrentCallsProduceOneAuditRecord() {
+        val transactionId = "txn-ctx-race-001"
+        val ruleId = "CONTEXTUAL_SCREENING"
+        val concurrency = 3
 
-    init {
-        "concurrent calls with same transactionId/ruleId produce only 1 audit record and identical results" {
-            val transactionId = "txn-ctx-race-001"
-            val ruleId = "CONTEXTUAL_SCREENING"
-            val concurrency = 3
+        val llmResponseJson = """
+            {
+                "decisao": "NAO_COMUNICAR",
+                "justificativa": "Operação compatível com perfil do cliente",
+                "enquadramentoLegal": ["Circular BACEN 3.978/2020"],
+                "fundamentacaoTecnica": "Análise detalhada",
+                "confianca": 0.92,
+                "alertas": [],
+                "timestamp": "2024-01-15T14:30:00.000Z"
+            }
+        """.trimIndent()
 
-            // Enqueue enough MockWebServer responses for all concurrent calls that might reach the LLM.
-            // Due to the race condition, only 1 call should actually persist an audit record,
-            // but multiple threads may pass the idempotency check before the first insert completes.
-            val llmResponseJson = """
-                {
-                    "decisao": "NAO_COMUNICAR",
-                    "justificativa": "Operação compatível com perfil do cliente",
-                    "enquadramentoLegal": ["Circular BACEN 3.978/2020"],
-                    "fundamentacaoTecnica": "Análise detalhada",
-                    "confianca": 0.92,
-                    "alertas": [],
-                    "timestamp": "2024-01-15T14:30:00.000Z"
-                }
-            """.trimIndent()
+        repeat(concurrency) {
+            mockWebServer.enqueue(
+                MockResponse().setBody(llmResponseJson).addHeader("Content-Type", "application/json")
+            )
+        }
 
-            repeat(concurrency) {
-                mockWebServer.enqueue(
-                    MockResponse()
-                        .setBody(llmResponseJson)
-                        .addHeader("Content-Type", "application/json")
-                )
+        val requestBody = """
+            {
+                "transactionId": "$transactionId",
+                "ruleId": "$ruleId",
+                "description": "Transferência de R$ 5.000 para conta corrente do mesmo titular",
+                "matchedKeyword": "terrorismo"
+            }
+        """.trimIndent()
+
+        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        val entity = HttpEntity(requestBody, headers)
+
+        val executor = Executors.newFixedThreadPool(concurrency)
+        try {
+            val futures = (1..concurrency).map {
+                CompletableFuture.supplyAsync({
+                    restTemplate.postForEntity("/v1/rules/contextual-screening/evaluate", entity, Map::class.java)
+                }, executor)
             }
 
-            val requestBody = """
-                {
-                    "transactionId": "$transactionId",
-                    "ruleId": "$ruleId",
-                    "description": "Transferência de R$ 5.000 para conta corrente do mesmo titular",
-                    "matchedKeyword": "terrorismo"
-                }
-            """.trimIndent()
+            val responses = futures.map { it.get() }
 
-            val headers = HttpHeaders().apply {
-                contentType = MediaType.APPLICATION_JSON
+            responses.forEach { response ->
+                assertEquals(HttpStatus.OK, response.statusCode)
+                assertNotNull(response.body)
             }
-            val entity = HttpEntity(requestBody, headers)
 
-            val executor = Executors.newFixedThreadPool(concurrency)
-            try {
-                val futures = (1..concurrency).map {
-                    CompletableFuture.supplyAsync({
-                        restTemplate.postForEntity(
-                            "/v1/rules/contextual-screening/evaluate",
-                            entity,
-                            Map::class.java
-                        )
-                    }, executor)
-                }
+            val classifications = responses.map { it.body!!["classification"] }
+            val confidences = responses.map { it.body!!["confidence"] }
+            val requiresReviews = responses.map { it.body!!["requiresAnalystReview"] }
 
-                val responses = futures.map { it.get() }
+            assertEquals(1, classifications.distinct().size)
+            assertEquals(1, confidences.distinct().size)
+            assertEquals(1, requiresReviews.distinct().size)
+            assertEquals("FALSE_POSITIVE", classifications.first())
 
-                // All responses should be HTTP 200
-                responses.forEach { response ->
-                    response.statusCode shouldBe HttpStatus.OK
-                    response.body shouldNotBe null
-                }
-
-                // All responses should return the same classification and confidence
-                val classifications = responses.map { it.body!!["classification"] }
-                val confidences = responses.map { it.body!!["confidence"] }
-                val requiresReviews = responses.map { it.body!!["requiresAnalystReview"] }
-
-                classifications.distinct().size shouldBe 1
-                confidences.distinct().size shouldBe 1
-                requiresReviews.distinct().size shouldBe 1
-
-                // Verify the classification matches expected value
-                classifications.first() shouldBe "FALSE_POSITIVE"
-
-                // Verify EXACTLY 1 audit record exists in the database (UNIQUE constraint)
-                val count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
-                    Long::class.java,
-                    transactionId,
-                    ruleId
-                )
-                count shouldBe 1L
-            } finally {
-                executor.shutdown()
-            }
+            val count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",
+                Long::class.java, transactionId, ruleId
+            )
+            assertEquals(1L, count)
+        } finally {
+            executor.shutdown()
         }
     }
 }

@@ -3,6 +3,7 @@ package br.com.screening.infrastructure.output.persistence.mapper
 import br.com.screening.domain.model.Classification
 import br.com.screening.domain.model.ContextualScreeningAudit
 import br.com.screening.infrastructure.output.persistence.entity.ContextualScreeningAuditEntity
+import br.com.shared.domain.valueobject.TransactionId
 import org.springframework.stereotype.Component
 
 @Component
@@ -11,7 +12,7 @@ class ContextualScreeningAuditMapper {
     fun toDomain(entity: ContextualScreeningAuditEntity): ContextualScreeningAudit =
         ContextualScreeningAudit(
             id = entity.id,
-            transactionId = entity.transactionId,
+            transactionId = TransactionId(entity.transactionId),
             ruleId = entity.ruleId,
             keyword = entity.keyword,
             prompt = entity.prompt,
@@ -29,7 +30,7 @@ class ContextualScreeningAuditMapper {
     fun toEntity(domain: ContextualScreeningAudit): ContextualScreeningAuditEntity =
         ContextualScreeningAuditEntity(
             id = domain.id ?: 0,
-            transactionId = domain.transactionId,
+            transactionId = domain.transactionId.value,
             ruleId = domain.ruleId,
             keyword = domain.keyword,
             prompt = domain.prompt,

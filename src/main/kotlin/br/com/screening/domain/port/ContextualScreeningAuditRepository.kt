@@ -2,6 +2,7 @@ package br.com.screening.domain.port
 
 import br.com.screening.domain.model.Classification
 import br.com.screening.domain.model.ContextualScreeningAudit
+import br.com.shared.domain.valueobject.TransactionId
 
 /**
  * Porta de persistência para registros de auditoria do Contextual Screening.
@@ -12,7 +13,7 @@ interface ContextualScreeningAuditRepository {
      * Busca auditoria existente pelo par (transactionId, ruleId).
      * Usado para idempotência.
      */
-    fun findByTransactionIdAndRuleId(transactionId: String, ruleId: String): ContextualScreeningAudit?
+    fun findByTransactionIdAndRuleId(transactionId: TransactionId, ruleId: String): ContextualScreeningAudit?
 
     /**
      * Persiste um novo registro de auditoria.
@@ -24,5 +25,5 @@ interface ContextualScreeningAuditRepository {
     /**
      * Atualiza o campo analystDecision de um registro de auditoria existente.
      */
-    fun updateAnalystDecision(transactionId: String, ruleId: String, decision: Classification)
+    fun updateAnalystDecision(transactionId: TransactionId, ruleId: String, decision: Classification)
 }

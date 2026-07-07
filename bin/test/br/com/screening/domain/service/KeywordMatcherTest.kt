@@ -2,41 +2,47 @@ package br.com.screening.domain.service
 
 import br.com.screening.domain.model.Category
 import br.com.screening.domain.model.RestrictedTerm
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
-import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import java.time.Instant
 
 /**
  * Testes unitários para [KeywordMatcher] — exemplos concretos.
  * Requirements: 3.2, 3.3, 3.5
  */
-class KeywordMatcherTest : StringSpec({
+class KeywordMatcherTest {
 
-    val matcher = KeywordMatcher()
+    private val matcher = KeywordMatcher()
 
-    fun term(t: String, cat: Category = Category.AML, active: Boolean = true) =
+    private fun term(t: String, cat: Category = Category.AML, active: Boolean = true) =
         RestrictedTerm(id = 1, term = t, category = cat, active = active, createdAt = Instant.now(), updatedAt = Instant.now())
 
-    "deve retornar match quando descrição é exatamente igual ao termo" {
+    @Test
+    @DisplayName("deve retornar match quando descrição é exatamente igual ao termo")
+    fun shouldMatchExactDescription() {
         val terms = setOf(term("lavagem"))
         val result = matcher.findMatches("lavagem", terms)
 
-        result.size shouldBe 1
-        result[0].term shouldBe "lavagem"
-        result[0].category shouldBe Category.AML
+        assertEquals(1, result.size)
+        assertEquals("lavagem", result[0].term)
+        assertEquals(Category.AML, result[0].category)
     }
 
-    "deve retornar match quando descrição contém o termo como substring" {
+    @Test
+    @DisplayName("deve retornar match quando descrição contém o termo como substring")
+    fun shouldMatchSubstring() {
         val terms = setOf(term("lavagem"))
         val result = matcher.findMatches("transferencia lavagem de dinheiro", terms)
 
-        result.size shouldBe 1
-        result[0].term shouldBe "lavagem"
+        assertEquals(1, result.size)
+        assertEquals("lavagem", result[0].term)
     }
 
-    "deve retornar todos os matches quando descrição contém múltiplos termos restritos" {
+    @Test
+    @DisplayName("deve retornar todos os matches quando descrição contém múltiplos termos restritos")
+    fun shouldMatchMultipleTerms() {
         val terms = setOf(
             term("lavagem", Category.AML),
             term("terrorismo", Category.TERRORISM),
@@ -44,33 +50,36 @@ class KeywordMatcherTest : StringSpec({
         )
         val result = matcher.findMatches("suspeita de lavagem e terrorismo na transacao", terms)
 
-        result.size shouldBe 2
-        result.map { it.term } shouldContainExactlyInAnyOrder listOf("lavagem", "terrorismo")
+        assertEquals(2, result.size)
+        assertTrue(result.map { it.term }.containsAll(listOf("lavagem", "terrorismo")))
     }
 
-    "deve retornar lista vazia quando descrição não contém nenhum termo restrito" {
-        val terms = setOf(
-            term("lavagem"),
-            term("terrorismo")
-        )
+    @Test
+    @DisplayName("deve retornar lista vazia quando descrição não contém nenhum termo restrito")
+    fun shouldReturnEmptyWhenNoMatch() {
+        val terms = setOf(term("lavagem"), term("terrorismo"))
         val result = matcher.findMatches("pagamento normal de fornecedor", terms)
 
-        result.shouldBeEmpty()
+        assertTrue(result.isEmpty())
     }
 
-    "deve ignorar termos com active=false mesmo que descrição os contenha" {
+    @Test
+    @DisplayName("deve ignorar termos com active=false mesmo que descrição os contenha")
+    fun shouldIgnoreInactiveTerms() {
         val terms = setOf(
             term("lavagem", active = false),
             term("fraude", active = false)
         )
         val result = matcher.findMatches("suspeita de lavagem e fraude", terms)
 
-        result.shouldBeEmpty()
+        assertTrue(result.isEmpty())
     }
 
-    "deve retornar lista vazia quando activeTerms é vazio" {
+    @Test
+    @DisplayName("deve retornar lista vazia quando activeTerms é vazio")
+    fun shouldReturnEmptyWhenNoTerms() {
         val result = matcher.findMatches("qualquer descricao aqui", emptySet())
 
-        result.shouldBeEmpty()
+        assertTrue(result.isEmpty())
     }
-})
+}

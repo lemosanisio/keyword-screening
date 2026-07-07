@@ -8,34 +8,40 @@ import br.com.screening.domain.model.ContextualScreeningAudit
 import br.com.screening.domain.model.HistoricalDecision
 import br.com.screening.domain.port.ContextualScreeningAuditRepository
 import br.com.screening.domain.port.HistoricalDecisionRepository
-import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.shouldBe
+import br.com.shared.domain.valueobject.TransactionId
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
 import java.time.Instant
 
-class AnalystDecisionServiceTest : StringSpec({
+class AnalystDecisionServiceTest {
 
-    val auditRepository = mockk<ContextualScreeningAuditRepository>()
-    val historicalDecisionRepository = mockk<HistoricalDecisionRepository>()
+    private val auditRepository = mockk<ContextualScreeningAuditRepository>()
+    private val historicalDecisionRepository = mockk<HistoricalDecisionRepository>()
 
-    val service = AnalystDecisionService(
+    private val service = AnalystDecisionService(
         auditRepository = auditRepository,
         historicalDecisionRepository = historicalDecisionRepository
     )
 
-    val transactionId = "TX-100"
-    val ruleId = "CONTEXTUAL_SCREENING"
+    private val transactionId = TransactionId("TX-100")
+    private val ruleId = "CONTEXTUAL_SCREENING"
 
-    beforeTest {
+    @BeforeEach
+    fun setup() {
         clearMocks(auditRepository, historicalDecisionRepository)
     }
 
-    "valid decision FALSE_POSITIVE persists HistoricalDecision and updates analystDecision in audit" {
+    @Test
+    @DisplayName("valid decision FALSE_POSITIVE persists HistoricalDecision and updates analystDecision in audit")
+    fun validDecisionPersistsAndUpdatesAudit() {
         val audit = ContextualScreeningAudit(
             id = 1L,
             transactionId = transactionId,
@@ -66,20 +72,21 @@ class AnalystDecisionServiceTest : StringSpec({
 
         val result = service.execute(command)
 
-        result.transactionId shouldBe transactionId
-        result.ruleId shouldBe ruleId
-        result.analystDecision shouldBe "FALSE_POSITIVE"
+        assertEquals(transactionId.value, result.transactionId)
+        assertEquals(ruleId, result.ruleId)
+        assertEquals("FALSE_POSITIVE", result.analystDecision)
 
-        // Verify HistoricalDecision was persisted with correct data
         val captured = historicalDecisionSlot.captured
-        captured.keyword shouldBe "terrorismo"
-        captured.analystDecision shouldBe Classification.FALSE_POSITIVE
+        assertEquals("terrorismo", captured.keyword)
+        assertEquals(Classification.FALSE_POSITIVE, captured.analystDecision)
 
         verify(exactly = 1) { historicalDecisionRepository.save(any()) }
         verify(exactly = 1) { auditRepository.updateAnalystDecision(transactionId, ruleId, Classification.FALSE_POSITIVE) }
     }
 
-    "audit not found throws AuditNotFoundException" {
+    @Test
+    @DisplayName("audit not found throws AuditNotFoundException")
+    fun auditNotFoundThrowsException() {
         every { auditRepository.findByTransactionIdAndRuleId(transactionId, ruleId) } returns null
 
         val command = RegisterAnalystDecisionCommand(
@@ -88,7 +95,7 @@ class AnalystDecisionServiceTest : StringSpec({
             analystDecision = "SUSPICIOUS"
         )
 
-        shouldThrow<AuditNotFoundException> {
+        assertThrows(AuditNotFoundException::class.java) {
             service.execute(command)
         }
 
@@ -96,14 +103,16 @@ class AnalystDecisionServiceTest : StringSpec({
         verify(exactly = 0) { auditRepository.updateAnalystDecision(any(), any(), any()) }
     }
 
-    "invalid decision value throws InvalidClassificationException" {
+    @Test
+    @DisplayName("invalid decision value throws InvalidClassificationException")
+    fun invalidDecisionThrowsException() {
         val command = RegisterAnalystDecisionCommand(
             transactionId = transactionId,
             ruleId = ruleId,
             analystDecision = "INVALID"
         )
 
-        shouldThrow<InvalidClassificationException> {
+        assertThrows(InvalidClassificationException::class.java) {
             service.execute(command)
         }
 
@@ -111,4 +120,4 @@ class AnalystDecisionServiceTest : StringSpec({
         verify(exactly = 0) { historicalDecisionRepository.save(any()) }
         verify(exactly = 0) { auditRepository.updateAnalystDecision(any(), any(), any()) }
     }
-})
+}

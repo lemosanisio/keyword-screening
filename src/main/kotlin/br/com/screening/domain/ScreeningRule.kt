@@ -1,6 +1,7 @@
 package br.com.screening.domain
 
 import br.com.screening.domain.model.ScreeningResult
+import br.com.shared.domain.valueobject.TransactionId
 
 /**
  * Interface genérica para regras de screening.
@@ -8,5 +9,5 @@ import br.com.screening.domain.model.ScreeningResult
  */
 interface ScreeningRule {
     val ruleCode: String
-    fun evaluate(transactionId: String, description: String): ScreeningResult
+    fun evaluate(transactionId: TransactionId, description: String): ScreeningResult
 }
