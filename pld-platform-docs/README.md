@@ -3,7 +3,7 @@
 Status: baseline de planejamento `v0.1`  
 Escopo: análise de PLD do onboarding à revisão contínua, investigação transacional, decisão sobre relacionamento, dossiê regulatório e comunicação ao COAF.
 
-Este pacote define um produto único para o analista, implementado em três aplicações independentes. Ele não transforma os três repositórios em um monólito nem distribui a mesma regra de negócio entre serviços.
+Este pacote define um produto único para o analista, implementado em três aplicações independentes que vivem em um único repositório Git (monorepo, ver [ADR-004](adr/ADR-004-monorepo-layout.md)). Ele não transforma as três aplicações em um monólito nem distribui a mesma regra de negócio entre serviços.
 
 ## Resultado esperado
 
@@ -17,13 +17,13 @@ O analista deve conseguir, em uma única interface:
 - produzir o dossiê interno e a comunicação ao COAF quando aplicável;
 - reconstruir depois o que ocorreu, quando, por quem, sob qual política e com quais evidências.
 
-## Repositórios e fronteiras
+## Aplicações e fronteiras
 
-| Nome de trabalho | Situação | Responsabilidade exclusiva | Não deve possuir |
+| Aplicação | Situação | Responsabilidade exclusiva | Não deve possuir |
 |---|---|---|---|
-| `keyword-screening` / futuro `pld-transaction-screening` | Expandir o repositório existente de Anderson | ingestão e análise de transações, regras transacionais, explicação da execução, sinais e projeção local de risco do cliente | fila humana, dossiê do cliente, decisão de conta, comunicação ao COAF |
-| `pld-customer-analysis` | Criar um segundo backend | visão consolidada do cliente, evidências, análises, deriva, casos, revalidação, decisões, dossiê, COAF, timeline e BFF do frontend | execução de regras de alta vazão para cada transação |
-| `pld-workbench` | Criar frontend React | experiência única dos analistas e administradores, consumindo modelos de leitura do segundo backend | regras regulatórias, decisão automática ou integração direta com bancos de outros serviços |
+| `pld-transaction-screening/` | Serviço existente, expandido no monorepo | ingestão e análise de transações, regras transacionais, explicação da execução, sinais e projeção local de risco do cliente | fila humana, dossiê do cliente, decisão de conta, comunicação ao COAF |
+| `pld-customer-analysis/` | Novo backend | visão consolidada do cliente, evidências, análises, deriva, casos, revalidação, decisões, dossiê, COAF, timeline e BFF do frontend | execução de regras de alta vazão para cada transação |
+| `pld-workbench/` | Novo frontend React (Marco 4) | experiência única dos analistas e administradores, consumindo modelos de leitura do segundo backend | regras regulatórias, decisão automática ou integração direta com bancos de outros serviços |
 
 O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele não é o núcleo do produto nem a API usada pelo frontend.
 
@@ -52,14 +52,14 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 
 ### Serviço transacional existente
 
-- [Requisitos](transaction-screening/transaction-screening-requirements.md)
-- [Arquitetura alvo](transaction-screening/transaction-screening-architecture.md)
-- [Plano de migração](transaction-screening/transaction-screening-migration-plan.md)
+- [Requisitos](../pld-transaction-screening/docs/pld-expansion/transaction-screening-requirements.md)
+- [Arquitetura alvo](../pld-transaction-screening/docs/pld-expansion/transaction-screening-architecture.md)
+- [Plano de migração](../pld-transaction-screening/docs/pld-expansion/transaction-screening-migration-plan.md)
 
 ### Novo backend
 
-- [Requisitos](customer-analysis/customer-analysis-requirements.md)
-- [Arquitetura alvo](customer-analysis/customer-analysis-architecture.md)
+- [Requisitos](../pld-customer-analysis/docs/customer-analysis-requirements.md)
+- [Arquitetura alvo](../pld-customer-analysis/docs/customer-analysis-architecture.md)
 
 ### Frontend React
 
@@ -71,6 +71,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [ADR-001 — fronteiras dos serviços](adr/ADR-001-service-boundaries.md)
 - [ADR-002 — auditoria e eventos](adr/ADR-002-audit-and-eventing.md)
 - [ADR-003 — decisão e deriva](adr/ADR-003-decision-and-derivation-model.md)
+- [ADR-004 — monorepo](adr/ADR-004-monorepo-layout.md)
 - [Handoff para o agente local](agent-handoff.md)
 
 ## Ordem recomendada de implementação
@@ -86,8 +87,8 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 
 ## Regra de governança da documentação
 
-- Este pacote é a fonte da arquitetura entre repositórios.
-- Cada repositório mantém perto do código apenas seus requisitos, sua arquitetura e links para a versão dos contratos compartilhados.
+- Este pacote é a fonte da arquitetura entre as aplicações do monorepo.
+- Cada aplicação mantém perto do código apenas seus requisitos, sua arquitetura e links para a versão dos contratos compartilhados.
 - Mudança incompatível de evento exige nova versão de schema e período de convivência.
 - Mudança na semântica de decisão exige aprovação de Produto/PLD/Compliance e uma versão de política rastreável.
 - A base regulatória deve ser validada por Compliance/Jurídico antes de produção; estes documentos traduzem necessidades de produto e engenharia, não constituem parecer jurídico.

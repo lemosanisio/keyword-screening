@@ -4,28 +4,28 @@ Este documento transforma a arquitetura em uma sequência executável sem mistur
 
 ## Layout de trabalho
 
-Manter quatro diretórios irmãos, cada repositório Git independente quando aplicável:
+Um único repositório Git (monorepo) contendo as três aplicações e este pacote — ver [ADR-004](adr/ADR-004-monorepo-layout.md), que substitui a versão original desta seção:
 
 ```text
-workspace/
-├── keyword-screening/          # repositório existente de Anderson
-├── pld-customer-analysis/      # novo backend
-├── pld-workbench/              # novo frontend React
-└── pld-platform-docs/          # este pacote, fonte dos contratos compartilhados
+keyword-screening/                # monorepo da plataforma PLD
+├── pld-transaction-screening/    # backend transacional (serviço existente)
+├── pld-customer-analysis/        # novo backend
+├── pld-workbench/                # novo frontend React (criado no Marco 4)
+└── pld-platform-docs/            # este pacote, fonte dos contratos compartilhados
 ```
 
-Não mover o histórico do repositório existente nem iniciar a implementação como monorepo. Um workspace local pode abrir os quatro diretórios em conjunto.
+Monorepo não é monólito: as fronteiras de ADR-001 permanecem (deploy, banco e ownership independentes por aplicação; nenhum serviço lê tabelas do outro). Cada aplicação mantém build próprio — não introduzir build raiz compartilhado sem necessidade real.
 
 ## Onde colocar cada documentação
 
-| Origem neste pacote | Destino sugerido |
+| Origem neste pacote | Destino |
 |---|---|
-| `transaction-screening/*.md` | `keyword-screening/docs/pld-expansion/` |
+| `transaction-screening/*.md` | `pld-transaction-screening/docs/pld-expansion/` |
 | `customer-analysis/*.md` | `pld-customer-analysis/docs/` |
-| `frontend/*.md` | `pld-workbench/docs/` |
-| `shared/*.md` e `adr/*.md` | manter em `pld-platform-docs`; cada repositório aponta para a versão do contrato compartilhado usada |
+| `frontend/*.md` | manter em `pld-platform-docs/frontend/` até o Marco 4; depois `pld-workbench/docs/` |
+| `shared/*.md`, `adr/*.md`, `README.md`, `agent-handoff.md` | manter em `pld-platform-docs/` na raiz do monorepo; cada aplicação registra a versão dos contratos que consome |
 
-Não manter cópias manuais divergentes dos contratos compartilhados. Se a empresa não quiser um quarto repositório, publicar esses contratos em catálogo/portal de engenharia e registrar em cada aplicação um arquivo pequeno com a versão consumida.
+Não manter cópias manuais divergentes dos contratos compartilhados: a fonte é `pld-platform-docs/` no monorepo. Registrar em cada aplicação um arquivo pequeno com a versão consumida.
 
 ## Decisões que já podem ser tratadas como fechadas
 
@@ -135,7 +135,7 @@ Saída: uma fila humana e nenhuma duplicidade de trabalho.
 
 ## Forma recomendada dos pull requests
 
-- Um PR de fundação por repositório.
+- Um PR de fundação por aplicação.
 - PRs verticais pequenos, cada um com migration, domínio, API/evento, observabilidade e testes.
 - Mudanças de schema compartilhado em PR próprio, aprovadas pelos donos dos dois backends.
 - Não combinar renomeação ampla do código existente com mudança de semântica no mesmo PR.

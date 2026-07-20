@@ -5,7 +5,9 @@
 Este repositório é um monorepo da plataforma PLD:
 
 - `pld-transaction-screening/` — API Kotlin/Spring (screening de transações PIX); todo o layout de pacotes abaixo refere-se a este serviço
-- `pld-customer-analysis/` — serviço de análise de clientes (em especificação)
+- `pld-customer-analysis/` — novo backend de análise de clientes (requisitos em `pld-customer-analysis/docs/`)
+- `pld-workbench/` — frontend React (criado no Marco 4 do plano de expansão)
+- `pld-platform-docs/` — arquitetura, requisitos e contratos compartilhados da plataforma (fonte: ADR-001 a 004)
 - `docker-compose.yml` — infraestrutura compartilhada (Postgres), rodar da raiz
 
 ## Arquitetura
