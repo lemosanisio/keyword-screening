@@ -19,7 +19,7 @@ Adotamos abordagem **API First**:
 ### Localização
 
 ```
-src/main/resources/openapi/openapi.yaml   # Contrato OpenAPI 3.1 completo (dentro do classpath)
+pld-transaction-screening/src/main/resources/openapi/openapi.yaml   # Contrato OpenAPI 3.1 completo (dentro do classpath)
 ```
 
 ### Cobertura do spec

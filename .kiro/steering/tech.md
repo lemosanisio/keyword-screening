@@ -29,10 +29,11 @@
 ## Comandos
 
 ```bash
-# Subir banco de dados local
-docker compose -f docker/docker-compose.yml up postgres -d
+# Subir banco de dados local (na raiz do monorepo)
+docker compose up postgres -d
 
-# Rodar aplicação
+# Rodar aplicação (todos os ./gradlew abaixo rodam dentro de pld-transaction-screening/)
+cd pld-transaction-screening
 ./gradlew bootRun
 
 # Testes unitários + PBT (default task, integração excluída automaticamente)
@@ -50,10 +51,10 @@ docker compose -f docker/docker-compose.yml up postgres -d
 
 ## API-First (OpenAPI Generator)
 
-- Spec: `src/main/resources/static/openapi/openapi.yaml`
+- Spec: `pld-transaction-screening/src/main/resources/static/openapi/openapi.yaml`
 - Gerador: `kotlin-spring` com `interfaceOnly=true`
 - Pacotes gerados: `br.com.generated.api` (interfaces) e `br.com.generated.model` (DTOs)
-- Output: `build/generated/openapi/src/main/kotlin`
+- Output: `pld-transaction-screening/build/generated/openapi/src/main/kotlin`
 - Controllers implementam as interfaces geradas — não editar código em `build/generated/`
 
 ## Configuração Local

@@ -303,7 +303,7 @@ curl -X PATCH http://localhost:8080/v1/alerts/{alertId}/status \
 
 ## Documentação Técnica
 
-- **OpenAPI Spec**: `src/main/resources/openapi/openapi.yaml`
+- **OpenAPI Spec**: `pld-transaction-screening/src/main/resources/openapi/openapi.yaml`
 - **ADRs**: `docs/adr/`
 - **Requirements**: `.kiro/specs/decision-engine/requirements.md`
 - **Design**: `.kiro/specs/decision-engine/design.md`

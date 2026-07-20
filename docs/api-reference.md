@@ -1,6 +1,6 @@
 # API Reference
 
-Contrato formal: [OpenAPI Spec](../src/main/resources/static/openapi/openapi.yaml)
+Contrato formal: [OpenAPI Spec](../pld-transaction-screening/src/main/resources/static/openapi/openapi.yaml)
 Swagger UI: http://localhost:8080/swagger-ui/index.html
 
 ## Screening Context

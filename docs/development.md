@@ -8,10 +8,11 @@
 ## Setup Local
 
 ```bash
-# Subir banco
-docker compose -f docker/docker-compose.yml up postgres -d
+# Subir banco (na raiz do monorepo)
+docker compose up postgres -d
 
-# Rodar aplicação
+# Rodar aplicação (dentro do serviço)
+cd pld-transaction-screening
 ./gradlew bootRun
 ```
 
@@ -19,6 +20,8 @@ Acessa: http://localhost:8080
 Swagger UI: http://localhost:8080/swagger-ui/index.html
 
 ## Comandos
+
+> Todos os comandos `./gradlew` abaixo rodam dentro de `pld-transaction-screening/`.
 
 ```bash
 # Testes unitários + Property-Based (exclui integração)

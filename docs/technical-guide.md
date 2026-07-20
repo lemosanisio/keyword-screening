@@ -145,7 +145,7 @@ Um Fact Resolver busca dados de um sistema externo e os transforma em Facts tipa
 ### 4.1 Criar o Resolver
 
 ```kotlin
-// src/main/kotlin/br/com/decision/domain/resolver/CustomerPepResolver.kt
+// pld-transaction-screening/src/main/kotlin/br/com/decision/domain/resolver/CustomerPepResolver.kt
 package br.com.decision.domain.resolver
 
 import br.com.decision.domain.event.DetectionEvent
@@ -183,7 +183,7 @@ class CustomerPepResolver(
 ### 4.2 Criar o Port (interface)
 
 ```kotlin
-// src/main/kotlin/br/com/decision/domain/port/CustomerDataPort.kt
+// pld-transaction-screening/src/main/kotlin/br/com/decision/domain/port/CustomerDataPort.kt
 package br.com.decision.domain.port
 
 import br.com.shared.domain.valueobject.CustomerId
@@ -196,7 +196,7 @@ interface CustomerDataPort {
 ### 4.3 Criar o Adapter (infraestrutura)
 
 ```kotlin
-// src/main/kotlin/br/com/decision/infrastructure/output/rest/CustomerDataAdapter.kt
+// pld-transaction-screening/src/main/kotlin/br/com/decision/infrastructure/output/rest/CustomerDataAdapter.kt
 @Component
 class CustomerDataAdapter(
     private val properties: CustomerDataProperties

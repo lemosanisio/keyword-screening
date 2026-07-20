@@ -352,7 +352,7 @@ Um **Alert** é gerado automaticamente quando o Decision Engine decide ALERT com
 |-----|-----------|
 | [User Guide](user-guide.md) | Como o analista usa a API (passo a passo com curl) |
 | [Technical Guide](technical-guide.md) | Como a engenharia expande o catálogo (SQL + código) |
-| [OpenAPI Spec](../src/main/resources/static/openapi/openapi.yaml) | Contrato formal da API REST |
+| [OpenAPI Spec](../pld-transaction-screening/src/main/resources/static/openapi/openapi.yaml) | Contrato formal da API REST |
 | [ADRs](adr/) | Decisões arquiteturais |
 | [Requirements](./../.kiro/specs/decision-engine/requirements.md) | Requisitos detalhados |
 | [Design](./../.kiro/specs/decision-engine/design.md) | Design técnico |

@@ -7,10 +7,11 @@ Plataforma de regras para **Prevenção à Lavagem de Dinheiro (PLD)** que detec
 ```bash
 # Pré-requisitos: JDK 21, Docker
 
-# Subir banco
-docker compose -f docker/docker-compose.yml up postgres -d
+# Subir banco (na raiz do monorepo)
+docker compose up postgres -d
 
-# Rodar aplicação
+# Rodar aplicação (dentro do serviço)
+cd pld-transaction-screening
 ./gradlew bootRun
 
 # Testes
@@ -19,6 +20,17 @@ docker compose -f docker/docker-compose.yml up postgres -d
 
 - Aplicação: http://localhost:8080
 - Swagger UI: http://localhost:8080/swagger-ui/index.html
+
+## Estrutura
+
+Monorepo da plataforma PLD:
+
+| Caminho | Descrição |
+|---------|-----------|
+| `pld-transaction-screening/` | API Kotlin/Spring — screening de transações PIX |
+| `pld-customer-analysis/` | Serviço de análise de clientes (em especificação) |
+| `docker-compose.yml` | Infraestrutura compartilhada (Postgres) |
+| `docs/` | Documentação da plataforma |
 
 ## Documentação
 
