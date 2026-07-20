@@ -18,7 +18,7 @@ services:
 
 #  app:
 #    build:
-#      context: .
+#      context: pld-transaction-screening
 #      dockerfile: Dockerfile
 #    container_name: screening-app
 #    ports:
