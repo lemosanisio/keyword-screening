@@ -12,6 +12,7 @@ out/
 
 # Kotlin
 *.class
+bin/
 
 # OS
 .DS_Store
