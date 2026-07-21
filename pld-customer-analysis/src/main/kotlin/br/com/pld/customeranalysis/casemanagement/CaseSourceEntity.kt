@@ -3,6 +3,8 @@ package br.com.pld.customeranalysis.casemanagement
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 @Entity
@@ -22,6 +24,19 @@ class CaseSourceEntity(
     var severity: String = "",
 
     var reasonCode: String = "",
+
+    var evaluationId: String? = null,
+
+    var transactionId: String? = null,
+
+    var signalType: String? = null,
+
+    var recommendedRoute: String? = null,
+
+    var riskProfileVersion: Int? = null,
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    var ruleMatches: String = "[]",
 
     var groupingPolicyVersion: String = "",
 

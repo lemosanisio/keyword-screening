@@ -79,6 +79,17 @@ class TransactionSignalConsumer(
                     sourceSystem = "pld-transaction-screening",
                     severity = event.severity,
                     recommendedRoute = event.recommendedRoute,
+                    evaluationId = event.evaluationId,
+                    transactionId = event.transactionId,
+                    signalType = event.signalType,
+                    riskProfileVersion = event.riskProfileVersion,
+                    ruleMatches = event.ruleMatches.map {
+                        br.com.pld.customeranalysis.casemanagement.RuleMatchView(
+                            ruleCode = it.ruleCode,
+                            ruleVersion = it.ruleVersion,
+                            explanationCode = it.explanationCode,
+                        )
+                    },
                     reasonCode = "TRANSACTION_SIGNAL_${event.severity}",
                     occurredAt = event.occurredAt,
                     correlationId = event.correlationId,
@@ -109,15 +120,31 @@ class TransactionSignalConsumer(
             partyId = subject.requiredText("partyId"),
             analysisCycleId = subject.optionalText("analysisCycleId"),
             signalId = payload.requiredText("signalId"),
+            evaluationId = payload.requiredText("evaluationId"),
+            transactionId = payload.requiredText("transactionId"),
+            signalType = payload.requiredText("signalType"),
             severity = payload.requiredText("severity"),
             recommendedRoute = payload.optionalText("recommendedRoute"),
             riskProfileVersion = payload.optionalInt("riskProfileVersion"),
+            ruleMatches = payload.requiredArray("ruleMatches").map {
+                TransactionRuleMatch(
+                    ruleCode = it.requiredText("ruleCode"),
+                    ruleVersion = it.requiredInt("ruleVersion"),
+                    explanationCode = it.optionalText("explanationCode"),
+                )
+            },
         )
     }
 
     private fun JsonNode.requiredObject(fieldName: String): JsonNode {
         val value = get(fieldName)
         require(value != null && value.isObject) { "$fieldName is required" }
+        return value
+    }
+
+    private fun JsonNode.requiredArray(fieldName: String): Iterable<JsonNode> {
+        val value = get(fieldName)
+        require(value != null && value.isArray) { "$fieldName is required" }
         return value
     }
 
@@ -159,7 +186,17 @@ private data class TransactionSignalEvent(
     val partyId: String,
     val analysisCycleId: String?,
     val signalId: String,
+    val evaluationId: String,
+    val transactionId: String,
+    val signalType: String,
     val severity: String,
     val recommendedRoute: String?,
     val riskProfileVersion: Int?,
+    val ruleMatches: List<TransactionRuleMatch>,
+)
+
+private data class TransactionRuleMatch(
+    val ruleCode: String,
+    val ruleVersion: Int,
+    val explanationCode: String?,
 )

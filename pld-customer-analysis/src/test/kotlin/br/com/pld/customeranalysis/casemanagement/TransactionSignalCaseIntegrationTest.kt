@@ -86,6 +86,15 @@ class TransactionSignalCaseIntegrationTest {
                 jsonPath("$.sources[0].sourceId") { value("sig_01J6ZK7Q3W8K0M2N4P6R8T0V2F") }
                 jsonPath("$.sources[0].sourceType") { value("TransactionSignal") }
                 jsonPath("$.sources[0].severity") { value("HIGH") }
+                jsonPath("$.sources[0].evaluationId") { value("evl_01J6ZK7Q3W8K0M2N4P6R8T0V2G") }
+                jsonPath("$.sources[0].transactionId") { value("txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H") }
+                jsonPath("$.sources[0].signalType") { value("RULE_MATCH") }
+                jsonPath("$.sources[0].recommendedRoute") { value("DERIVED_TO_ANALYST") }
+                jsonPath("$.sources[0].riskProfileVersion") { value(7) }
+                jsonPath("$.sources[0].ruleMatches.length()") { value(1) }
+                jsonPath("$.sources[0].ruleMatches[0].ruleCode") { value("PIX-009") }
+                jsonPath("$.sources[0].ruleMatches[0].ruleVersion") { value(4) }
+                jsonPath("$.sources[0].ruleMatches[0].explanationCode") { value("AMOUNT_OUTSIDE_PROFILE") }
                 jsonPath("$.timeline.entries.length()") { value(3) }
                 jsonPath("$.timeline.entries[2].entryType") { value("CASE_CREATED") }
             }

@@ -12,10 +12,10 @@ Escopo: iniciar a fila humana única com casos transacionais derivados dos sinai
 - [x] Timeline `CASE_CREATED` e outbox `CaseStatusChanged` na criação de caso.
 - [x] API mínima de fila: `GET /v1/cases`.
 - [x] API mínima de detalhe: `GET /v1/cases/{caseId}` com Party, fontes anexadas e timeline.
+- [x] Projeção mínima de sinal transacional no workspace: avaliação, transação, tipo, rota, versão de risco e regras acionadas.
 
 ## Próximo corte
 
-- [ ] Persistir/projetar detalhes mínimos do sinal transacional para o workspace do caso.
 - [ ] Incluir ações disponíveis no workspace conforme status/perfil.
 - [ ] Implementar assumir/devolver caso (`ASSIGNED`/`OPEN`) com versionamento simples.
 - [ ] Emitir `CaseStatusChanged.v1` nas transições operacionais.

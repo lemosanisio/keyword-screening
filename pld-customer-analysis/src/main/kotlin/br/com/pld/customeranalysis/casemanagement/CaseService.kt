@@ -10,6 +10,8 @@ import br.com.pld.customeranalysis.timeline.TimelineEntryJpaRepository
 import br.com.pld.customeranalysis.timeline.TimelineService
 import br.com.pld.customeranalysis.timeline.TimelineView
 import br.com.pld.customeranalysis.timeline.VisibilityClassification
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -23,6 +25,7 @@ class CaseService(
     private val partyService: PartyService,
     private val timelineService: TimelineService,
     private val outboxService: OutboxService,
+    private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
@@ -59,6 +62,12 @@ class CaseService(
                 sourceType = "TransactionSignal",
                 severity = command.severity,
                 reasonCode = command.reasonCode,
+                evaluationId = command.evaluationId,
+                transactionId = command.transactionId,
+                signalType = command.signalType,
+                recommendedRoute = command.recommendedRoute,
+                riskProfileVersion = command.riskProfileVersion,
+                ruleMatches = objectMapper.writeValueAsString(command.ruleMatches),
                 groupingPolicyVersion = GROUPING_POLICY_VERSION,
                 correlationId = command.correlationId,
                 causationId = command.eventId,
@@ -81,7 +90,8 @@ class CaseService(
         return CaseDetailView(
             case = CaseView.from(case),
             party = partyService.get(case.partyId),
-            sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id).map(CaseSourceView::from),
+            sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id)
+                .map { CaseSourceView.from(it, objectMapper) },
             timeline = timelineService.getByPartyId(case.partyId),
         )
     }
@@ -158,6 +168,11 @@ data class RecordTransactionSignalCaseCommand(
     val sourceSystem: String,
     val severity: String,
     val recommendedRoute: String?,
+    val evaluationId: String?,
+    val transactionId: String?,
+    val signalType: String?,
+    val riskProfileVersion: Int?,
+    val ruleMatches: List<RuleMatchView>,
     val reasonCode: String,
     val occurredAt: Instant,
     val correlationId: String,
@@ -203,17 +218,29 @@ data class CaseSourceView(
     val sourceSystem: String,
     val sourceType: String,
     val severity: String,
+    val evaluationId: String?,
+    val transactionId: String?,
+    val signalType: String?,
+    val recommendedRoute: String?,
+    val riskProfileVersion: Int?,
+    val ruleMatches: JsonNode,
     val reasonCode: String,
     val correlationId: String,
     val causationId: String,
     val attachedAt: Instant,
 ) {
     companion object {
-        fun from(entity: CaseSourceEntity): CaseSourceView = CaseSourceView(
+        fun from(entity: CaseSourceEntity, objectMapper: ObjectMapper): CaseSourceView = CaseSourceView(
             sourceId = entity.sourceId,
             sourceSystem = entity.sourceSystem,
             sourceType = entity.sourceType,
             severity = entity.severity,
+            evaluationId = entity.evaluationId,
+            transactionId = entity.transactionId,
+            signalType = entity.signalType,
+            recommendedRoute = entity.recommendedRoute,
+            riskProfileVersion = entity.riskProfileVersion,
+            ruleMatches = objectMapper.readTree(entity.ruleMatches),
             reasonCode = entity.reasonCode,
             correlationId = entity.correlationId,
             causationId = entity.causationId,
@@ -221,5 +248,11 @@ data class CaseSourceView(
         )
     }
 }
+
+data class RuleMatchView(
+    val ruleCode: String,
+    val ruleVersion: Int,
+    val explanationCode: String?,
+)
 
 class CaseNotFoundException(caseId: String) : RuntimeException("Case not found: $caseId")
