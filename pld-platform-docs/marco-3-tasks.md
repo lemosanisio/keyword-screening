@@ -1,6 +1,6 @@
 # Marco 3 — colaboração e decisão humana
 
-Status: em andamento  
+Status: implementação concluída
 Escopo: permitir trabalho humano auditável no caso antes das decisões formais de relacionamento e suspeição.
 
 ## Concluído
@@ -9,10 +9,12 @@ Escopo: permitir trabalho humano auditável no caso antes das decisões formais 
 - [x] Exibir comentários no workspace do caso.
 - [x] Decisão de suspeição mínima com timeline e evento `SuspicionDecisionIssued.v1`.
 - [x] Decisão de relacionamento mínima com timeline e evento `AccountDecisionIssued.v1`.
+- [x] Payloads de decisão alinhados ao contrato v1 essencial.
+- [x] Revisão/validação humana secundária mínima para decisões sensíveis.
 
-## Próximo corte
+## Próximos marcos
 
-- [ ] Revisão/validação humana secundária para decisões sensíveis.
+- [ ] Definir corte do próximo marco operacional.
 
 ## Fora deste corte inicial
 

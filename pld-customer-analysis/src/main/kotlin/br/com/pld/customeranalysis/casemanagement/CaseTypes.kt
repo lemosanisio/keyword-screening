@@ -27,6 +27,19 @@ enum class CaseAction {
     ASSIGN,
     START_ANALYSIS,
     RETURN_TO_QUEUE,
+    APPROVE_DECISION,
+}
+
+enum class DecisionRoute {
+    AUTOMATIC,
+    DERIVED_TO_ANALYST,
+    MANDATORY_SECOND_APPROVAL,
+    TECHNICAL_RETRY,
+}
+
+enum class DecisionApprovalStatus {
+    PENDING_APPROVAL,
+    APPROVED,
 }
 
 enum class SuspicionDecisionValue {

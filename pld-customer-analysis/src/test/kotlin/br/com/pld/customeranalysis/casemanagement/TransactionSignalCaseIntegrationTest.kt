@@ -6,6 +6,8 @@ import br.com.pld.customeranalysis.party.CreatePartyCommand
 import br.com.pld.customeranalysis.party.PartyService
 import br.com.pld.customeranalysis.party.PartyType
 import br.com.pld.customeranalysis.transactionprojection.TransactionSignalConsumer
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,6 +41,9 @@ class TransactionSignalCaseIntegrationTest {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
 
     @BeforeEach
     fun cleanDatabase() {
@@ -105,7 +110,7 @@ class TransactionSignalCaseIntegrationTest {
 
     @Test
     fun `returns not found for unknown case`() {
-        mockMvc.get("/v1/cases/{caseId}", "cas_01J6ZK7Q3W8K0M2N4P6R8T0BAD")
+        mockMvc.get("/v1/cases/{caseId}", "cse_01J6ZK7Q3W8K0M2N4P6R8T0BAD")
             .andExpect {
                 status { isNotFound() }
             }
@@ -266,11 +271,12 @@ class TransactionSignalCaseIntegrationTest {
             """.trimIndent()
         }.andExpect {
             status { isCreated() }
-            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("sdn_")) }
+            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("dec_")) }
             jsonPath("$.caseId") { value(caseId) }
             jsonPath("$.decision") { value("NO_SUSPICION") }
             jsonPath("$.decisionVersion") { value(1) }
             jsonPath("$.decidedByActorId") { value("analyst-1") }
+            jsonPath("$.approvalStatus") { value("APPROVED") }
         }
 
         mockMvc.get("/v1/cases/{caseId}", caseId)
@@ -293,6 +299,15 @@ class TransactionSignalCaseIntegrationTest {
             "SuspicionDecisionIssued",
             "CaseStatusChanged",
         )
+        outboxPayload("SuspicionDecisionIssued").also { payload ->
+            assertThat(payload["decisionId"].asText()).startsWith("dec_")
+            assertThat(payload["caseId"].asText()).isEqualTo(caseId)
+            assertThat(payload["decision"].asText()).isEqualTo("NO_SUSPICION")
+            assertThat(payload["route"].asText()).isEqualTo("DERIVED_TO_ANALYST")
+            assertThat(payload["policyVersion"].asText()).isEqualTo("suspicion-policy-1")
+            assertThat(payload["analysisCycleId"].asText()).isEqualTo(DEFAULT_ANALYSIS_CYCLE_ID)
+            assertThat(payload.has("supersedesDecisionId")).isFalse()
+        }
     }
 
     @Test
@@ -318,11 +333,12 @@ class TransactionSignalCaseIntegrationTest {
             """.trimIndent()
         }.andExpect {
             status { isCreated() }
-            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("adn_")) }
+            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("dec_")) }
             jsonPath("$.caseId") { value(caseId) }
             jsonPath("$.decision") { value("MAINTAIN") }
             jsonPath("$.decisionVersion") { value(1) }
             jsonPath("$.decidedByActorId") { value("analyst-1") }
+            jsonPath("$.approvalStatus") { value("APPROVED") }
         }
 
         mockMvc.get("/v1/cases/{caseId}", caseId)
@@ -343,6 +359,108 @@ class TransactionSignalCaseIntegrationTest {
             "AccountDecisionIssued",
             "CaseStatusChanged",
         )
+        outboxPayload("AccountDecisionIssued").also { payload ->
+            assertThat(payload["decisionId"].asText()).startsWith("dec_")
+            assertThat(payload["caseId"].asText()).isEqualTo(caseId)
+            assertThat(payload["decision"].asText()).isEqualTo("MAINTAIN")
+            assertThat(payload["context"].asText()).isEqualTo("ONGOING")
+            assertThat(payload["route"].asText()).isEqualTo("DERIVED_TO_ANALYST")
+            assertThat(payload["policyVersion"].asText()).isEqualTo("account-decision-policy-1")
+            assertThat(payload["analysisCycleId"].asText()).isEqualTo(DEFAULT_ANALYSIS_CYCLE_ID)
+            assertThat(payload.has("supersedesDecisionId")).isFalse()
+        }
+    }
+
+    @Test
+    fun `sensitive account decision requires approval from a second actor before publishing decision event`() {
+        val partyId = createParty()
+        transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
+        val caseId = cases().single().caseId
+        assignAndStartAnalysis(caseId)
+
+        mockMvc.post("/v1/cases/{caseId}/account-decisions", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-account-decision-sensitive")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "expectedVersion": 3,
+                  "decision": "TERMINATE_RELATIONSHIP",
+                  "reasonCodes": ["HIGH_IMPACT_ACTION"],
+                  "narrative": "Risco operacional justifica encerramento do relacionamento.",
+                  "policyVersion": "account-decision-policy-1"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("dec_")) }
+            jsonPath("$.decision") { value("TERMINATE_RELATIONSHIP") }
+            jsonPath("$.approvalStatus") { value("PENDING_APPROVAL") }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.case.status") { value("PENDING_APPROVAL") }
+                jsonPath("$.case.version") { value(4) }
+                jsonPath("$.availableActions") { value(org.hamcrest.Matchers.contains("APPROVE_DECISION")) }
+                jsonPath("$.accountDecisions[0].approvalStatus") { value("PENDING_APPROVAL") }
+            }
+
+        assertThat(outboxEventTypes()).containsExactly(
+            "PartyCreated",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+        )
+
+        mockMvc.post("/v1/cases/{caseId}/approve-decision", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-account-decision-approval-same-actor")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":4}"""
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.post("/v1/cases/{caseId}/approve-decision", caseId) {
+            header("X-Actor-Id", "lead-1")
+            header("X-Actor-Role", "APPROVER")
+            header("X-Correlation-Id", "corr-account-decision-approval")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":4}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("DECIDED") }
+            jsonPath("$.version") { value(5) }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.accountDecisions[0].approvalStatus") { value("APPROVED") }
+                jsonPath("$.accountDecisions[0].approvedByActorId") { value("lead-1") }
+            }
+
+        assertThat(timelineEntryTypes(partyId)).contains("ACCOUNT_DECISION_PENDING_APPROVAL", "ACCOUNT_DECISION_APPROVED")
+        assertThat(outboxEventTypes()).containsExactly(
+            "PartyCreated",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "AccountDecisionIssued",
+            "CaseStatusChanged",
+        )
+        outboxPayload("AccountDecisionIssued").also { payload ->
+            assertThat(payload["decision"].asText()).isEqualTo("TERMINATE_RELATIONSHIP")
+            assertThat(payload["route"].asText()).isEqualTo("MANDATORY_SECOND_APPROVAL")
+            assertThat(payload["context"].asText()).isEqualTo("ONGOING")
+            assertThat(payload["analysisCycleId"].asText()).isEqualTo(DEFAULT_ANALYSIS_CYCLE_ID)
+        }
     }
 
     private fun createParty(): String = partyService.create(
@@ -406,6 +524,14 @@ class TransactionSignalCaseIntegrationTest {
         String::class.java,
     )
 
+    private fun outboxPayload(eventType: String): JsonNode = objectMapper.readTree(
+        jdbcTemplate.queryForObject(
+            "select payload from outbox_event where event_type = ? order by occurred_at desc, id desc limit 1",
+            String::class.java,
+            eventType,
+        ),
+    )
+
     private fun transactionSignalDetectedEvent(
         partyId: String,
         eventId: String = "01J6ZK7Q3W8K0M2N4P6R8T0V2A",
@@ -421,7 +547,7 @@ class TransactionSignalCaseIntegrationTest {
           "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
           "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2C",
           "actor": {"type": "SYSTEM", "id": "rule-engine"},
-          "subject": {"partyId": "$partyId", "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E", "analysisCycleId": null, "caseId": null},
+          "subject": {"partyId": "$partyId", "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E", "analysisCycleId": "$DEFAULT_ANALYSIS_CYCLE_ID", "caseId": null},
           "dataClassification": "CONFIDENTIAL",
           "payload": {
             "signalId": "$signalId",
@@ -437,6 +563,8 @@ class TransactionSignalCaseIntegrationTest {
     """.trimIndent()
 
     companion object {
+        private const val DEFAULT_ANALYSIS_CYCLE_ID = "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B"
+
         @Container
         private val postgres = PostgreSQLContainer("postgres:16-alpine")
 

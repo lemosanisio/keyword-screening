@@ -11,6 +11,7 @@ import br.com.pld.customeranalysis.casemanagement.CaseQueueView
 import br.com.pld.customeranalysis.casemanagement.CaseService
 import br.com.pld.customeranalysis.casemanagement.CaseVersionConflictException
 import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
+import br.com.pld.customeranalysis.casemanagement.DecisionApprovalConflictException
 import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
 import br.com.pld.customeranalysis.casemanagement.IssueAccountDecisionCommand
 import br.com.pld.customeranalysis.casemanagement.IssueSuspicionDecisionCommand
@@ -145,6 +146,18 @@ class CaseController(
             .body(decision)
     }
 
+    @PostMapping("/{caseId}/approve-decision")
+    fun approveDecision(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: CaseTransitionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): CaseCommandResultView = caseService.approvePendingDecision(
+        caseId,
+        command(request, actorId, actorRole, correlationId),
+    )
+
     private fun command(
         request: CaseTransitionRequest,
         actorId: String?,
@@ -159,7 +172,11 @@ class CaseController(
     @ExceptionHandler(CaseNotFoundException::class)
     fun notFound(): ResponseEntity<Void> = ResponseEntity.notFound().build()
 
-    @ExceptionHandler(CaseVersionConflictException::class, InvalidCaseTransitionException::class)
+    @ExceptionHandler(
+        CaseVersionConflictException::class,
+        InvalidCaseTransitionException::class,
+        DecisionApprovalConflictException::class,
+    )
     fun conflict(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.CONFLICT).build()
 }
 

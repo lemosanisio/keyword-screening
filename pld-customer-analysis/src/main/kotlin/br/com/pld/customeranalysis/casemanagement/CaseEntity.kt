@@ -15,6 +15,8 @@ class CaseEntity(
 
     var partyId: String = "",
 
+    var analysisCycleId: String? = null,
+
     @Enumerated(EnumType.STRING)
     var origin: CaseOrigin = CaseOrigin.TRANSACTION_ALERT,
 

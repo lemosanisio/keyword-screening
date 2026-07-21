@@ -74,6 +74,7 @@ class TransactionSignalConsumer(
             caseService.recordTransactionSignal(
                 RecordTransactionSignalCaseCommand(
                     partyId = event.partyId,
+                    analysisCycleId = event.analysisCycleId,
                     signalId = event.signalId,
                     eventId = event.eventId,
                     sourceSystem = "pld-transaction-screening",

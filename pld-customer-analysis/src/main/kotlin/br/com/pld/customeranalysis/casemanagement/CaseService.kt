@@ -154,10 +154,12 @@ class CaseService(
 
         val previousDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
         val previousStatus = case.status
+        val requiresApproval = requiresSecondApproval(command.decision)
+        val route = decisionRoute(requiresApproval)
         val now = Instant.now(clock)
         val decision = suspicionDecisionRepository.save(
             SuspicionDecisionEntity(
-                id = PrefixedUlid.next("sdn_"),
+                id = PrefixedUlid.next("dec_"),
                 caseId = case.id,
                 partyId = case.partyId,
                 decision = command.decision,
@@ -170,6 +172,7 @@ class CaseService(
                 decidedAt = now,
                 correlationId = command.correlationId,
                 previousDecisionId = previousDecision?.id,
+                approvalStatus = approvalStatus(requiresApproval),
             ),
         )
 
@@ -177,12 +180,16 @@ class CaseService(
             TimelineEntryEntity(
                 id = PrefixedUlid.next("tml_"),
                 partyId = case.partyId,
-                entryType = "SUSPICION_DECISION_ISSUED",
+                entryType = if (requiresApproval) "SUSPICION_DECISION_PENDING_APPROVAL" else "SUSPICION_DECISION_ISSUED",
                 businessOccurredAt = now,
                 recordedAt = now,
                 actorType = command.actor.role.name,
                 actorId = command.actor.id,
-                summaryCode = "SUSPICION_DECISION_${command.decision.name}",
+                summaryCode = if (requiresApproval) {
+                    "SUSPICION_DECISION_${command.decision.name}_PENDING_APPROVAL"
+                } else {
+                    "SUSPICION_DECISION_${command.decision.name}"
+                },
                 objectType = "SuspicionDecision",
                 objectId = decision.id,
                 objectVersion = decision.decisionVersion.toString(),
@@ -192,24 +199,11 @@ class CaseService(
             ),
         )
 
-        outboxService.append(
-            eventType = "SuspicionDecisionIssued",
-            aggregateType = "SuspicionDecision",
-            aggregateId = decision.id,
-            payload = mapOf(
-                "decisionId" to decision.id,
-                "caseId" to case.id,
-                "partyId" to case.partyId,
-                "decision" to decision.decision.name,
-                "decisionVersion" to decision.decisionVersion,
-                "reasonCodes" to command.reasonCodes,
-                "policyVersion" to decision.policyVersion,
-                "previousDecisionId" to decision.previousDecisionId,
-                "correlationId" to command.correlationId,
-            ),
-        )
+        if (!requiresApproval) {
+            emitSuspicionDecisionIssued(case, decision, route, command.correlationId)
+        }
 
-        case.status = CaseStatus.DECIDED
+        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.DECIDED
         case.version += 1
         case.updatedAt = now
         recordCaseStatusChanged(
@@ -218,7 +212,7 @@ class CaseService(
             actor = command.actor,
             correlationId = command.correlationId,
             now = now,
-            summaryCode = "CASE_DECIDED",
+            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "CASE_DECIDED",
         )
 
         return SuspicionDecisionView.from(decision, objectMapper)
@@ -234,10 +228,12 @@ class CaseService(
 
         val previousDecision = accountDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
         val previousStatus = case.status
+        val requiresApproval = requiresSecondApproval(command.decision)
+        val route = decisionRoute(requiresApproval)
         val now = Instant.now(clock)
         val decision = accountDecisionRepository.save(
             AccountDecisionEntity(
-                id = PrefixedUlid.next("adn_"),
+                id = PrefixedUlid.next("dec_"),
                 caseId = case.id,
                 partyId = case.partyId,
                 decision = command.decision,
@@ -250,6 +246,7 @@ class CaseService(
                 decidedAt = now,
                 correlationId = command.correlationId,
                 previousDecisionId = previousDecision?.id,
+                approvalStatus = approvalStatus(requiresApproval),
             ),
         )
 
@@ -257,12 +254,16 @@ class CaseService(
             TimelineEntryEntity(
                 id = PrefixedUlid.next("tml_"),
                 partyId = case.partyId,
-                entryType = "ACCOUNT_DECISION_ISSUED",
+                entryType = if (requiresApproval) "ACCOUNT_DECISION_PENDING_APPROVAL" else "ACCOUNT_DECISION_ISSUED",
                 businessOccurredAt = now,
                 recordedAt = now,
                 actorType = command.actor.role.name,
                 actorId = command.actor.id,
-                summaryCode = "ACCOUNT_DECISION_${command.decision.name}",
+                summaryCode = if (requiresApproval) {
+                    "ACCOUNT_DECISION_${command.decision.name}_PENDING_APPROVAL"
+                } else {
+                    "ACCOUNT_DECISION_${command.decision.name}"
+                },
                 objectType = "AccountDecision",
                 objectId = decision.id,
                 objectVersion = decision.decisionVersion.toString(),
@@ -272,22 +273,89 @@ class CaseService(
             ),
         )
 
-        outboxService.append(
-            eventType = "AccountDecisionIssued",
-            aggregateType = "AccountDecision",
-            aggregateId = decision.id,
-            payload = mapOf(
-                "decisionId" to decision.id,
-                "caseId" to case.id,
-                "partyId" to case.partyId,
-                "decision" to decision.decision.name,
-                "decisionVersion" to decision.decisionVersion,
-                "reasonCodes" to command.reasonCodes,
-                "policyVersion" to decision.policyVersion,
-                "previousDecisionId" to decision.previousDecisionId,
-                "correlationId" to command.correlationId,
-            ),
+        if (!requiresApproval) {
+            emitAccountDecisionIssued(case, decision, route, command.correlationId)
+        }
+
+        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.DECIDED
+        case.version += 1
+        case.updatedAt = now
+        recordCaseStatusChanged(
+            case = case,
+            previousStatus = previousStatus,
+            actor = command.actor,
+            correlationId = command.correlationId,
+            now = now,
+            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "CASE_DECIDED",
         )
+
+        return AccountDecisionView.from(decision, objectMapper)
+    }
+
+    @Transactional
+    fun approvePendingDecision(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        ensureStatus(case, CaseStatus.PENDING_APPROVAL)
+
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+        val suspicionDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+            ?.takeIf { it.approvalStatus == DecisionApprovalStatus.PENDING_APPROVAL }
+        val accountDecision = accountDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+            ?.takeIf { it.approvalStatus == DecisionApprovalStatus.PENDING_APPROVAL }
+
+        when {
+            suspicionDecision != null -> {
+                approveDecisionActor(suspicionDecision.decidedByActorId, command.actor.id)
+                suspicionDecision.approvalStatus = DecisionApprovalStatus.APPROVED
+                suspicionDecision.approvedByActorId = command.actor.id
+                suspicionDecision.approvedByActorRole = command.actor.role.name
+                suspicionDecision.approvedAt = now
+                recordDecisionApproval(
+                    case,
+                    objectType = "SuspicionDecision",
+                    objectId = suspicionDecision.id,
+                    objectVersion = suspicionDecision.decisionVersion,
+                    entryType = "SUSPICION_DECISION_APPROVED",
+                    summaryCode = "SUSPICION_DECISION_${suspicionDecision.decision.name}_APPROVED",
+                    actor = command.actor,
+                    correlationId = command.correlationId,
+                    now = now,
+                )
+                emitSuspicionDecisionIssued(
+                    case,
+                    suspicionDecision,
+                    DecisionRoute.MANDATORY_SECOND_APPROVAL,
+                    command.correlationId,
+                )
+            }
+            accountDecision != null -> {
+                approveDecisionActor(accountDecision.decidedByActorId, command.actor.id)
+                accountDecision.approvalStatus = DecisionApprovalStatus.APPROVED
+                accountDecision.approvedByActorId = command.actor.id
+                accountDecision.approvedByActorRole = command.actor.role.name
+                accountDecision.approvedAt = now
+                recordDecisionApproval(
+                    case,
+                    objectType = "AccountDecision",
+                    objectId = accountDecision.id,
+                    objectVersion = accountDecision.decisionVersion,
+                    entryType = "ACCOUNT_DECISION_APPROVED",
+                    summaryCode = "ACCOUNT_DECISION_${accountDecision.decision.name}_APPROVED",
+                    actor = command.actor,
+                    correlationId = command.correlationId,
+                    now = now,
+                )
+                emitAccountDecisionIssued(
+                    case,
+                    accountDecision,
+                    DecisionRoute.MANDATORY_SECOND_APPROVAL,
+                    command.correlationId,
+                )
+            }
+            else -> throw InvalidCaseTransitionException(case.id, case.status)
+        }
 
         case.status = CaseStatus.DECIDED
         case.version += 1
@@ -298,10 +366,10 @@ class CaseService(
             actor = command.actor,
             correlationId = command.correlationId,
             now = now,
-            summaryCode = "CASE_DECIDED",
+            summaryCode = "CASE_DECIDED_AFTER_SECOND_APPROVAL",
         )
 
-        return AccountDecisionView.from(decision, objectMapper)
+        return CaseCommandResultView.from(case, availableActions(case))
     }
 
     @Transactional
@@ -362,8 +430,9 @@ class CaseService(
     private fun createCase(command: RecordTransactionSignalCaseCommand, now: Instant): CaseEntity {
         val case = caseRepository.save(
             CaseEntity(
-                id = PrefixedUlid.next("cas_"),
+                id = PrefixedUlid.next("cse_"),
                 partyId = command.partyId,
+                analysisCycleId = command.analysisCycleId,
                 origin = CaseOrigin.TRANSACTION_ALERT,
                 status = CaseStatus.OPEN,
                 priority = priorityFrom(command.severity),
@@ -458,6 +527,94 @@ class CaseService(
         )
     }
 
+    private fun recordDecisionApproval(
+        case: CaseEntity,
+        objectType: String,
+        objectId: String,
+        objectVersion: Int,
+        entryType: String,
+        summaryCode: String,
+        actor: Actor,
+        correlationId: String,
+        now: Instant,
+    ) {
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = entryType,
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = actor.role.name,
+                actorId = actor.id,
+                summaryCode = summaryCode,
+                objectType = objectType,
+                objectId = objectId,
+                objectVersion = objectVersion.toString(),
+                correlationId = correlationId,
+                causationId = case.id,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+    }
+
+    private fun emitSuspicionDecisionIssued(
+        case: CaseEntity,
+        decision: SuspicionDecisionEntity,
+        route: DecisionRoute,
+        correlationId: String,
+    ) {
+        val decisionPayload = mutableMapOf<String, Any?>(
+            "decisionId" to decision.id,
+            "caseId" to case.id,
+            "partyId" to case.partyId,
+            "decision" to decision.decision.name,
+            "decisionVersion" to decision.decisionVersion,
+            "route" to route.name,
+            "reasonCodes" to objectMapper.readTree(decision.reasonCodes),
+            "policyVersion" to decision.policyVersion,
+            "analysisCycleId" to requireAnalysisCycleId(case),
+            "correlationId" to correlationId,
+        )
+        decision.previousDecisionId?.let { decisionPayload["supersedesDecisionId"] = it }
+
+        outboxService.append(
+            eventType = "SuspicionDecisionIssued",
+            aggregateType = "SuspicionDecision",
+            aggregateId = decision.id,
+            payload = decisionPayload,
+        )
+    }
+
+    private fun emitAccountDecisionIssued(
+        case: CaseEntity,
+        decision: AccountDecisionEntity,
+        route: DecisionRoute,
+        correlationId: String,
+    ) {
+        val decisionPayload = mutableMapOf<String, Any?>(
+            "decisionId" to decision.id,
+            "caseId" to case.id,
+            "partyId" to case.partyId,
+            "decision" to decision.decision.name,
+            "decisionVersion" to decision.decisionVersion,
+            "context" to accountDecisionContext(decision.decision),
+            "route" to route.name,
+            "reasonCodes" to objectMapper.readTree(decision.reasonCodes),
+            "policyVersion" to decision.policyVersion,
+            "analysisCycleId" to requireAnalysisCycleId(case),
+            "correlationId" to correlationId,
+        )
+        decision.previousDecisionId?.let { decisionPayload["supersedesDecisionId"] = it }
+
+        outboxService.append(
+            eventType = "AccountDecisionIssued",
+            aggregateType = "AccountDecision",
+            aggregateId = decision.id,
+            payload = decisionPayload,
+        )
+    }
+
     private fun ensureVersion(case: CaseEntity, expectedVersion: Int) {
         if (case.version != expectedVersion) {
             throw CaseVersionConflictException(case.id, expectedVersion, case.version)
@@ -474,6 +631,7 @@ class CaseService(
         CaseStatus.OPEN -> listOf(CaseAction.ASSIGN)
         CaseStatus.ASSIGNED -> listOf(CaseAction.START_ANALYSIS, CaseAction.RETURN_TO_QUEUE)
         CaseStatus.IN_ANALYSIS -> listOf(CaseAction.RETURN_TO_QUEUE)
+        CaseStatus.PENDING_APPROVAL -> listOf(CaseAction.APPROVE_DECISION)
         else -> emptyList()
     }
 
@@ -484,6 +642,47 @@ class CaseService(
         else -> CasePriority.MEDIUM
     }
 
+    private fun requireAnalysisCycleId(case: CaseEntity): String = requireNotNull(case.analysisCycleId) {
+        "Case ${case.id} does not have analysisCycleId"
+    }
+
+    private fun requiresSecondApproval(decision: SuspicionDecisionValue): Boolean =
+        decision == SuspicionDecisionValue.COMMUNICATE_TO_COAF
+
+    private fun requiresSecondApproval(decision: AccountDecisionValue): Boolean = when (decision) {
+        AccountDecisionValue.REJECT,
+        AccountDecisionValue.RESTRICT,
+        AccountDecisionValue.SUSPEND,
+        AccountDecisionValue.TERMINATE_RELATIONSHIP -> true
+        AccountDecisionValue.APPROVE,
+        AccountDecisionValue.APPROVE_WITH_CONDITIONS,
+        AccountDecisionValue.REQUEST_INFORMATION,
+        AccountDecisionValue.MAINTAIN -> false
+    }
+
+    private fun decisionRoute(requiresApproval: Boolean): DecisionRoute =
+        if (requiresApproval) DecisionRoute.MANDATORY_SECOND_APPROVAL else DecisionRoute.DERIVED_TO_ANALYST
+
+    private fun approvalStatus(requiresApproval: Boolean): DecisionApprovalStatus =
+        if (requiresApproval) DecisionApprovalStatus.PENDING_APPROVAL else DecisionApprovalStatus.APPROVED
+
+    private fun approveDecisionActor(decidedByActorId: String, approvingActorId: String) {
+        if (decidedByActorId == approvingActorId) {
+            throw DecisionApprovalConflictException(decidedByActorId)
+        }
+    }
+
+    private fun accountDecisionContext(decision: AccountDecisionValue): String = when (decision) {
+        AccountDecisionValue.APPROVE,
+        AccountDecisionValue.APPROVE_WITH_CONDITIONS,
+        AccountDecisionValue.REJECT -> "ONBOARDING"
+        AccountDecisionValue.MAINTAIN,
+        AccountDecisionValue.RESTRICT,
+        AccountDecisionValue.SUSPEND,
+        AccountDecisionValue.TERMINATE_RELATIONSHIP,
+        AccountDecisionValue.REQUEST_INFORMATION -> "ONGOING"
+    }
+
     companion object {
         const val GROUPING_POLICY_VERSION = "transaction-alert-grouping-1"
     }
@@ -491,6 +690,7 @@ class CaseService(
 
 data class RecordTransactionSignalCaseCommand(
     val partyId: String,
+    val analysisCycleId: String?,
     val signalId: String,
     val eventId: String,
     val sourceSystem: String,
@@ -635,6 +835,9 @@ data class SuspicionDecisionView(
     val decidedAt: Instant,
     val correlationId: String,
     val previousDecisionId: String?,
+    val approvalStatus: DecisionApprovalStatus,
+    val approvedByActorId: String?,
+    val approvedAt: Instant?,
 ) {
     companion object {
         fun from(entity: SuspicionDecisionEntity, objectMapper: ObjectMapper): SuspicionDecisionView =
@@ -652,6 +855,9 @@ data class SuspicionDecisionView(
                 decidedAt = entity.decidedAt,
                 correlationId = entity.correlationId,
                 previousDecisionId = entity.previousDecisionId,
+                approvalStatus = entity.approvalStatus,
+                approvedByActorId = entity.approvedByActorId,
+                approvedAt = entity.approvedAt,
             )
     }
 }
@@ -670,6 +876,9 @@ data class AccountDecisionView(
     val decidedAt: Instant,
     val correlationId: String,
     val previousDecisionId: String?,
+    val approvalStatus: DecisionApprovalStatus,
+    val approvedByActorId: String?,
+    val approvedAt: Instant?,
 ) {
     companion object {
         fun from(entity: AccountDecisionEntity, objectMapper: ObjectMapper): AccountDecisionView =
@@ -687,6 +896,9 @@ data class AccountDecisionView(
                 decidedAt = entity.decidedAt,
                 correlationId = entity.correlationId,
                 previousDecisionId = entity.previousDecisionId,
+                approvalStatus = entity.approvalStatus,
+                approvedByActorId = entity.approvedByActorId,
+                approvedAt = entity.approvedAt,
             )
     }
 }
@@ -740,3 +952,6 @@ class CaseVersionConflictException(caseId: String, expectedVersion: Int, actualV
 
 class InvalidCaseTransitionException(caseId: String, status: CaseStatus) :
     RuntimeException("Invalid transition for case $caseId from status $status")
+
+class DecisionApprovalConflictException(actorId: String) :
+    RuntimeException("Decision approval requires a different actor than $actorId")

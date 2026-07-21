@@ -40,4 +40,13 @@ class SuspicionDecisionEntity(
     var correlationId: String = "",
 
     var previousDecisionId: String? = null,
+
+    @Enumerated(EnumType.STRING)
+    var approvalStatus: DecisionApprovalStatus = DecisionApprovalStatus.APPROVED,
+
+    var approvedByActorId: String? = null,
+
+    var approvedByActorRole: String? = null,
+
+    var approvedAt: Instant? = null,
 )
