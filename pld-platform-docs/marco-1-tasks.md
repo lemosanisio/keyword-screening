@@ -18,11 +18,11 @@ Escopo: fundação vertical de `pld-customer-analysis`, conforme ADR-008.
 - [x] Scheduler/configuração para drenar a outbox fora do caminho síncrono da API.
 - [x] Testes de integração com PostgreSQL/Testcontainers cobrindo Party, AnalysisCycle, timeline, outbox e inbox.
 - [x] Segurança dev via headers (`X-Actor-Id`, `X-Actor-Role`, `X-Correlation-Id`) aplicada às APIs de escrita.
+- [x] Primeiro consumidor externo: `TransactionSignalDetected.v1` registrado idempotentemente na timeline.
 
 ## Próximo corte
 
 - [ ] Health/OpenAPI/métricas mínimos do novo backend.
-- [ ] Primeiro consumidor de evento externo usando `InboxService`.
 
 ## Fora do Marco 1
 
