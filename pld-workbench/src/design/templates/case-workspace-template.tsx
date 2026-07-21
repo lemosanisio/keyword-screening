@@ -5,6 +5,7 @@ import { CaseCommentsPanel } from "@/design/organisms/case-comments-panel";
 import { CaseHeader } from "@/design/organisms/case-header";
 import { CaseTimeline } from "@/design/organisms/case-timeline";
 import { DecisionPanel } from "@/design/organisms/decision-panel";
+import { EvidenceRequirementMatrix } from "@/design/organisms/evidence-requirement-matrix";
 import { PartySummary } from "@/design/molecules/party-summary";
 import type { DecisionCommand } from "@/api/types";
 
@@ -16,7 +17,9 @@ type CaseWorkspaceTemplateProps = {
   onStartAnalysis: () => void;
   onReturnToQueue: () => void;
   onApprove: () => void;
+  onComplete: () => void;
   onComment: (body: string) => void;
+  onRetryRequirement: (requirementId: string) => void;
   onAccountDecision: (command: DecisionCommand) => void;
   onSuspicionDecision: (command: DecisionCommand) => void;
 };
@@ -31,6 +34,7 @@ export function CaseWorkspaceTemplate(props: CaseWorkspaceTemplateProps) {
         onStartAnalysis={props.onStartAnalysis}
         onReturnToQueue={props.onReturnToQueue}
         onApprove={props.onApprove}
+        onComplete={props.onComplete}
       />
       {props.conflict && <Alert variant="warning">{props.conflict}</Alert>}
       <div className="grid gap-4 lg:grid-cols-[320px_1fr_380px]">
@@ -39,6 +43,7 @@ export function CaseWorkspaceTemplate(props: CaseWorkspaceTemplateProps) {
           <SignalsCard detail={props.detail} />
         </aside>
         <section className="space-y-4">
+          <EvidenceRequirementMatrix matrix={props.detail.evidenceMatrix} busy={props.busy} onRetry={props.onRetryRequirement} />
           <CaseTimeline entries={props.detail.timeline.entries} />
           <CaseCommentsPanel comments={props.detail.comments} busy={props.busy} onSubmit={props.onComment} />
         </section>
@@ -48,6 +53,8 @@ export function CaseWorkspaceTemplate(props: CaseWorkspaceTemplateProps) {
             accountDecisions={props.detail.accountDecisions}
             suspicionDecisions={props.detail.suspicionDecisions}
             busy={props.busy}
+            decisionAllowed={props.detail.decisionReadiness.allowed}
+            blockingReasons={props.detail.decisionReadiness.blockingReasons}
             onAccountDecision={props.onAccountDecision}
             onSuspicionDecision={props.onSuspicionDecision}
           />

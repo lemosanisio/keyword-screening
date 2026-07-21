@@ -113,8 +113,75 @@ export type CaseDetailView = {
   comments: CaseComment[];
   suspicionDecisions: DecisionView[];
   accountDecisions: DecisionView[];
+  evidenceMatrix: EvidenceMatrix;
+  decisionReadiness: Readiness;
+  completionReadiness: Readiness;
   timeline: TimelineView;
   availableActions: CaseAction[];
+};
+
+export type EvidenceScenario = "CLEAR" | "SOURCE_UNAVAILABLE" | "RISK_CONTEXT";
+
+export type Readiness = {
+  allowed: boolean;
+  blockingReasons: string[];
+};
+
+export type EvidenceMatrix = {
+  collectionId?: string | null;
+  revision: number;
+  scenario?: EvidenceScenario | null;
+  policyVersion?: string | null;
+  requirements: EvidenceRequirement[];
+};
+
+export type EvidenceRequirement = {
+  requirementId: string;
+  code: string;
+  title: string;
+  category: string;
+  mandatory: boolean;
+  outcome: "PENDING" | "SATISFIED" | "NOT_SATISFIED" | "TECHNICAL_PENDING" | "WAIVED";
+  outcomeReason: string;
+  executions: SourceExecution[];
+};
+
+export type SourceExecution = {
+  executionId: string;
+  sourceCode: string;
+  sourceName: string;
+  attempt: number;
+  status: "SUCCESS_WITH_DATA" | "SUCCESS_NO_RESULTS" | "PARTIAL" | "CONFLICT" | "UNAVAILABLE" | "ERROR" | "EXPIRED";
+  startedAt: string;
+  completedAt: string;
+  validUntil?: string | null;
+  summary: string;
+  errorCode?: string | null;
+  evidence: EvidenceRecord[];
+};
+
+export type EvidenceRecord = {
+  evidenceId: string;
+  evidenceType: string;
+  title: string;
+  summary: string;
+  observedAt: string;
+  validUntil?: string | null;
+  referenceKey: string;
+  integrityHash: string;
+  classification: string;
+  structuredData: unknown;
+  facts: FactRecord[];
+};
+
+export type FactRecord = {
+  factId: string;
+  factCode: string;
+  label: string;
+  value: unknown;
+  quality: "PRESENT" | "UNKNOWN" | "STALE" | "ERROR";
+  observedAt: string;
+  validUntil?: string | null;
 };
 
 export type CommandResult = {

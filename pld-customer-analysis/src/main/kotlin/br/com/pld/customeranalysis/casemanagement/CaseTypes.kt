@@ -28,6 +28,7 @@ enum class CaseAction {
     START_ANALYSIS,
     RETURN_TO_QUEUE,
     APPROVE_DECISION,
+    COMPLETE_CASE,
 }
 
 enum class DecisionRoute {

@@ -48,7 +48,7 @@ class TransactionSignalCaseIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table account_decision, suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table fact_version, evidence_record, source_execution, analysis_requirement, evidence_collection, account_decision, suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -170,7 +170,7 @@ class TransactionSignalCaseIntegrationTest {
             jsonPath("$.status") { value("IN_ANALYSIS") }
             jsonPath("$.assignedActorId") { value("analyst-1") }
             jsonPath("$.version") { value(3) }
-            jsonPath("$.availableActions") { value(org.hamcrest.Matchers.contains("RETURN_TO_QUEUE")) }
+            jsonPath("$.availableActions") { value(org.hamcrest.Matchers.containsInAnyOrder("RETURN_TO_QUEUE", "COMPLETE_CASE")) }
         }
 
         mockMvc.post("/v1/cases/{caseId}/return-to-queue", caseId) {
@@ -249,7 +249,7 @@ class TransactionSignalCaseIntegrationTest {
     }
 
     @Test
-    fun `issues suspicion decision and closes case as decided`() {
+    fun `issues suspicion decision and completes case explicitly`() {
         val partyId = createParty()
         transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
         val caseId = cases().single().caseId
@@ -282,12 +282,24 @@ class TransactionSignalCaseIntegrationTest {
         mockMvc.get("/v1/cases/{caseId}", caseId)
             .andExpect {
                 status { isOk() }
-                jsonPath("$.case.status") { value("DECIDED") }
+                jsonPath("$.case.status") { value("IN_ANALYSIS") }
                 jsonPath("$.case.version") { value(4) }
-                jsonPath("$.availableActions.length()") { value(0) }
+                jsonPath("$.availableActions") { value(org.hamcrest.Matchers.containsInAnyOrder("RETURN_TO_QUEUE", "COMPLETE_CASE")) }
                 jsonPath("$.suspicionDecisions.length()") { value(1) }
                 jsonPath("$.suspicionDecisions[0].decision") { value("NO_SUSPICION") }
             }
+
+        mockMvc.post("/v1/cases/{caseId}/complete", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-case-complete")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":4}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("DECIDED") }
+            jsonPath("$.version") { value(5) }
+        }
 
         assertThat(timelineEntryTypes(partyId)).contains("SUSPICION_DECISION_ISSUED")
 
@@ -297,6 +309,7 @@ class TransactionSignalCaseIntegrationTest {
             "CaseStatusChanged",
             "CaseStatusChanged",
             "SuspicionDecisionIssued",
+            "CaseStatusChanged",
             "CaseStatusChanged",
         )
         outboxPayload("SuspicionDecisionIssued").also { payload ->
@@ -311,7 +324,7 @@ class TransactionSignalCaseIntegrationTest {
     }
 
     @Test
-    fun `issues account decision and closes case as decided`() {
+    fun `issues account decision and keeps case in analysis`() {
         val partyId = createParty()
         transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
         val caseId = cases().single().caseId
@@ -344,7 +357,7 @@ class TransactionSignalCaseIntegrationTest {
         mockMvc.get("/v1/cases/{caseId}", caseId)
             .andExpect {
                 status { isOk() }
-                jsonPath("$.case.status") { value("DECIDED") }
+                jsonPath("$.case.status") { value("IN_ANALYSIS") }
                 jsonPath("$.case.version") { value(4) }
                 jsonPath("$.accountDecisions.length()") { value(1) }
                 jsonPath("$.accountDecisions[0].decision") { value("MAINTAIN") }
@@ -434,7 +447,7 @@ class TransactionSignalCaseIntegrationTest {
             content = """{"expectedVersion":4}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.status") { value("DECIDED") }
+            jsonPath("$.status") { value("IN_ANALYSIS") }
             jsonPath("$.version") { value(5) }
         }
 
@@ -461,6 +474,110 @@ class TransactionSignalCaseIntegrationTest {
             assertThat(payload["context"].asText()).isEqualTo("ONGOING")
             assertThat(payload["analysisCycleId"].asText()).isEqualTo(DEFAULT_ANALYSIS_CYCLE_ID)
         }
+    }
+
+    @Test
+    fun `source unavailable scenario blocks decision until retry satisfies mandatory requirement`() {
+        val scenario = mockMvc.post("/v1/dev/scenarios/transaction-case") {
+            header("X-Actor-Id", "scenario-cli")
+            header("X-Actor-Role", "SYSTEM")
+            header("X-Correlation-Id", "corr-source-unavailable-scenario")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"scenario":"SOURCE_UNAVAILABLE"}"""
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString.let(objectMapper::readTree)
+        val caseId = scenario["caseId"].asText()
+
+        assignAndStartAnalysis(caseId)
+
+        val blockedWorkspace = mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.decisionReadiness.allowed") { value(false) }
+                jsonPath("$.evidenceMatrix.requirements.length()") { value(5) }
+            }
+            .andReturn().response.contentAsString.let(objectMapper::readTree)
+        val pepRequirement = blockedWorkspace["evidenceMatrix"]["requirements"].first {
+            it["code"].asText() == "PEP_SANCTIONS_CHECK"
+        }
+        val requirementId = pepRequirement["requirementId"].asText()
+        val revision = blockedWorkspace["evidenceMatrix"]["revision"].asInt()
+        assertThat(pepRequirement["outcome"].asText()).isEqualTo("TECHNICAL_PENDING")
+        assertThat(pepRequirement["executions"][0]["status"].asText()).isEqualTo("UNAVAILABLE")
+
+        mockMvc.post("/v1/cases/{caseId}/suspicion-decisions", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-blocked-decision")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "expectedVersion": 3,
+                  "decision": "NO_SUSPICION",
+                  "reasonCodes": ["TRANSACTION_SIGNAL_REVIEWED"],
+                  "narrative": "Tentativa de decisão deve ser bloqueada pela fonte indisponível.",
+                  "policyVersion": "suspicion-policy-1"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.post("/v1/cases/{caseId}/requirements/{requirementId}/retry", caseId, requirementId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-retry-source")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedEvidenceRevision":$revision}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision") { value(revision + 1) }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.decisionReadiness.allowed") { value(true) }
+                jsonPath("$.evidenceMatrix.requirements[1].outcome") { value("SATISFIED") }
+                jsonPath("$.evidenceMatrix.requirements[1].executions.length()") { value(2) }
+            }
+
+        mockMvc.post("/v1/cases/{caseId}/suspicion-decisions", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-unblocked-decision")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "expectedVersion": 3,
+                  "decision": "NO_SUSPICION",
+                  "reasonCodes": ["TRANSACTION_SIGNAL_REVIEWED"],
+                  "narrative": "Fonte retentada e requisitos obrigatórios satisfeitos.",
+                  "policyVersion": "suspicion-policy-1"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+        }
+
+        mockMvc.post("/v1/cases/{caseId}/complete", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-complete-after-evidence")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":4}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("DECIDED") }
+        }
+
+        assertThat(timelineEntryTypes(scenario["partyId"].asText())).contains(
+            "EVIDENCE_COLLECTION_CREATED",
+            "SOURCE_EXECUTION_RETRIED",
+            "REQUIREMENT_OUTCOME_CHANGED",
+            "CASE_COMPLETED",
+        )
     }
 
     private fun createParty(): String = partyService.create(

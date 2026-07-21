@@ -11,10 +11,11 @@ type CaseHeaderProps = {
   onStartAnalysis: () => void;
   onReturnToQueue: () => void;
   onApprove: () => void;
+  onComplete: () => void;
   busy: boolean;
 };
 
-export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue, onApprove, busy }: CaseHeaderProps) {
+export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue, onApprove, onComplete, busy }: CaseHeaderProps) {
   const actions = new Set(detail.availableActions);
   return (
     <Card>
@@ -35,6 +36,7 @@ export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue,
           {actions.has("START_ANALYSIS") && <Button disabled={busy} size="sm" onClick={onStartAnalysis}>Iniciar análise</Button>}
           {actions.has("RETURN_TO_QUEUE") && <Button disabled={busy} size="sm" variant="outline" onClick={onReturnToQueue}>Devolver</Button>}
           {actions.has("APPROVE_DECISION") && <Button disabled={busy} size="sm" onClick={onApprove}>Aprovar decisão</Button>}
+          {actions.has("COMPLETE_CASE") && <Button disabled={busy || !detail.completionReadiness.allowed} size="sm" onClick={onComplete}>Concluir caso</Button>}
         </div>
       </CardContent>
     </Card>

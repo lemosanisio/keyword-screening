@@ -25,6 +25,8 @@ type DecisionPanelProps = {
   onAccountDecision: (command: DecisionCommand) => void;
   onSuspicionDecision: (command: DecisionCommand) => void;
   busy: boolean;
+  decisionAllowed: boolean;
+  blockingReasons: string[];
 };
 
 export function DecisionPanel(props: DecisionPanelProps) {
@@ -34,6 +36,11 @@ export function DecisionPanel(props: DecisionPanelProps) {
         <CardTitle className="text-sm">Painel de decisão</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!props.decisionAllowed && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+            Decisão bloqueada por requisitos obrigatórios: {props.blockingReasons.join(", ")}
+          </div>
+        )}
         <DecisionForm
           title="Relacionamento"
           options={accountDecisionOptions}
@@ -41,6 +48,7 @@ export function DecisionPanel(props: DecisionPanelProps) {
           defaultPolicy="account-decision-policy-1"
           caseVersion={props.caseVersion}
           busy={props.busy}
+          disabled={!props.decisionAllowed}
           onSubmit={props.onAccountDecision}
         />
         <Separator />
@@ -51,6 +59,7 @@ export function DecisionPanel(props: DecisionPanelProps) {
           defaultPolicy="suspicion-policy-1"
           caseVersion={props.caseVersion}
           busy={props.busy}
+          disabled={!props.decisionAllowed}
           onSubmit={props.onSuspicionDecision}
         />
         <Separator />
@@ -74,6 +83,7 @@ function DecisionForm({
   defaultPolicy,
   caseVersion,
   busy,
+  disabled,
   onSubmit
 }: {
   title: string;
@@ -82,6 +92,7 @@ function DecisionForm({
   defaultPolicy: string;
   caseVersion: number;
   busy: boolean;
+  disabled: boolean;
   onSubmit: (command: DecisionCommand) => void;
 }) {
   const [decision, setDecision] = React.useState(defaultDecision);
@@ -107,7 +118,7 @@ function DecisionForm({
       <Textarea value={narrative} onChange={(event) => setNarrative(event.target.value)} placeholder="Narrativa da decisão" />
       <Button
         size="sm"
-        disabled={busy || narrative.trim().length === 0}
+        disabled={busy || disabled || narrative.trim().length === 0}
         onClick={() => onSubmit({
           expectedVersion: caseVersion,
           decision,

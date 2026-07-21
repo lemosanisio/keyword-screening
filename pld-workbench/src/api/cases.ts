@@ -1,5 +1,5 @@
 import { requestJson } from "./http";
-import type { CaseDetailView, CaseQueueView, CommandResult, DecisionCommand, DecisionView, DevActor } from "./types";
+import type { CaseDetailView, CaseQueueView, CommandResult, DecisionCommand, DecisionView, DevActor, EvidenceMatrix, EvidenceScenario } from "./types";
 
 export function getCases() {
   return requestJson<CaseQueueView>("/v1/cases");
@@ -41,6 +41,22 @@ export function approveDecision(caseId: string, expectedVersion: number, actor: 
   });
 }
 
+export function completeCase(caseId: string, expectedVersion: number, actor: DevActor) {
+  return requestJson<CommandResult>(`/v1/cases/${caseId}/complete`, {
+    method: "POST",
+    actor,
+    body: JSON.stringify({ expectedVersion })
+  });
+}
+
+export function retryRequirement(caseId: string, requirementId: string, expectedEvidenceRevision: number, actor: DevActor) {
+  return requestJson<EvidenceMatrix>(`/v1/cases/${caseId}/requirements/${requirementId}/retry`, {
+    method: "POST",
+    actor,
+    body: JSON.stringify({ expectedEvidenceRevision })
+  });
+}
+
 export function addComment(caseId: string, body: string, actor: DevActor) {
   return requestJson(`/v1/cases/${caseId}/comments`, {
     method: "POST",
@@ -65,9 +81,10 @@ export function issueSuspicionDecision(caseId: string, command: DecisionCommand,
   });
 }
 
-export function createTransactionCaseScenario(actor: DevActor) {
-  return requestJson<{ partyId: string; analysisCycleId: string; signalId: string }>("/v1/dev/scenarios/transaction-case", {
+export function createTransactionCaseScenario(actor: DevActor, scenario: EvidenceScenario = "CLEAR") {
+  return requestJson<{ partyId: string; analysisCycleId: string; caseId: string; signalId: string }>("/v1/dev/scenarios/transaction-case", {
     method: "POST",
-    actor
+    actor,
+    body: JSON.stringify({ scenario })
   });
 }

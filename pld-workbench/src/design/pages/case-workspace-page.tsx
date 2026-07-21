@@ -5,9 +5,11 @@ import {
   addComment,
   approveDecision,
   assignCase,
+  completeCase,
   getCase,
   issueAccountDecision,
   issueSuspicionDecision,
+  retryRequirement,
   returnToQueue,
   startAnalysis
 } from "@/api/cases";
@@ -75,7 +77,9 @@ export function CaseWorkspacePage() {
         onStartAnalysis={() => mutate.mutate(() => startAnalysis(caseId, version, actor))}
         onReturnToQueue={() => mutate.mutate(() => returnToQueue(caseId, version, actor))}
         onApprove={() => mutate.mutate(() => approveDecision(caseId, version, actor))}
+        onComplete={() => mutate.mutate(() => completeCase(caseId, version, actor))}
         onComment={(body) => mutate.mutate(() => addComment(caseId, body, actor))}
+        onRetryRequirement={(requirementId) => mutate.mutate(() => retryRequirement(caseId, requirementId, detail.evidenceMatrix.revision, actor))}
         onAccountDecision={(command: DecisionCommand) => mutate.mutate(() => issueAccountDecision(caseId, command, actor))}
         onSuspicionDecision={(command: DecisionCommand) => mutate.mutate(() => issueSuspicionDecision(caseId, command, actor))}
       />

@@ -1,6 +1,10 @@
 package br.com.pld.customeranalysis.casemanagement
 
 import br.com.pld.customeranalysis.common.PrefixedUlid
+import br.com.pld.customeranalysis.evidence.EvidenceMatrixView
+import br.com.pld.customeranalysis.evidence.EvidenceRequirementsBlockedException
+import br.com.pld.customeranalysis.evidence.EvidenceService
+import br.com.pld.customeranalysis.evidence.ReadinessView
 import br.com.pld.customeranalysis.identityaccess.Actor
 import br.com.pld.customeranalysis.integration.OutboxService
 import br.com.pld.customeranalysis.party.PartyService
@@ -27,6 +31,7 @@ class CaseService(
     private val timelineRepository: TimelineEntryJpaRepository,
     private val partyService: PartyService,
     private val timelineService: TimelineService,
+    private val evidenceService: EvidenceService,
     private val outboxService: OutboxService,
     private val objectMapper: ObjectMapper,
     private val clock: Clock = Clock.systemUTC(),
@@ -83,12 +88,14 @@ class CaseService(
 
     @Transactional(readOnly = true)
     fun queue(): CaseQueueView = CaseQueueView(
-        cases = caseRepository.findByStatusOrderByCreatedAtAsc(CaseStatus.OPEN).map(CaseView::from),
+        cases = caseRepository.findByStatusInOrderByCreatedAtAsc(ACTIVE_CASE_STATUSES).map(CaseView::from),
     )
 
     @Transactional(readOnly = true)
     fun get(caseId: String): CaseDetailView {
         val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        val evidenceMatrix = evidenceService.matrixForCase(case.id)
+        val decisionReadiness = evidenceService.readiness(evidenceMatrix)
 
         return CaseDetailView(
             case = CaseView.from(case),
@@ -100,6 +107,9 @@ class CaseService(
                 .map { SuspicionDecisionView.from(it, objectMapper) },
             accountDecisions = accountDecisionRepository.findByCaseIdOrderByDecisionVersionAsc(case.id)
                 .map { AccountDecisionView.from(it, objectMapper) },
+            evidenceMatrix = evidenceMatrix,
+            decisionReadiness = decisionReadiness,
+            completionReadiness = completionReadiness(case, decisionReadiness),
             timeline = timelineService.getByPartyId(case.partyId),
             availableActions = availableActions(case),
         )
@@ -151,6 +161,7 @@ class CaseService(
         if (case.status != CaseStatus.IN_ANALYSIS) {
             throw InvalidCaseTransitionException(case.id, case.status)
         }
+        ensureEvidenceReady(case)
 
         val previousDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
         val previousStatus = case.status
@@ -203,7 +214,7 @@ class CaseService(
             emitSuspicionDecisionIssued(case, decision, route, command.correlationId)
         }
 
-        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.DECIDED
+        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.IN_ANALYSIS
         case.version += 1
         case.updatedAt = now
         recordCaseStatusChanged(
@@ -212,7 +223,7 @@ class CaseService(
             actor = command.actor,
             correlationId = command.correlationId,
             now = now,
-            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "CASE_DECIDED",
+            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "SUSPICION_DECISION_REGISTERED",
         )
 
         return SuspicionDecisionView.from(decision, objectMapper)
@@ -225,6 +236,7 @@ class CaseService(
         if (case.status != CaseStatus.IN_ANALYSIS) {
             throw InvalidCaseTransitionException(case.id, case.status)
         }
+        ensureEvidenceReady(case)
 
         val previousDecision = accountDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
         val previousStatus = case.status
@@ -277,7 +289,7 @@ class CaseService(
             emitAccountDecisionIssued(case, decision, route, command.correlationId)
         }
 
-        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.DECIDED
+        case.status = if (requiresApproval) CaseStatus.PENDING_APPROVAL else CaseStatus.IN_ANALYSIS
         case.version += 1
         case.updatedAt = now
         recordCaseStatusChanged(
@@ -286,7 +298,7 @@ class CaseService(
             actor = command.actor,
             correlationId = command.correlationId,
             now = now,
-            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "CASE_DECIDED",
+            summaryCode = if (requiresApproval) "CASE_PENDING_APPROVAL" else "ACCOUNT_DECISION_REGISTERED",
         )
 
         return AccountDecisionView.from(decision, objectMapper)
@@ -357,7 +369,7 @@ class CaseService(
             else -> throw InvalidCaseTransitionException(case.id, case.status)
         }
 
-        case.status = CaseStatus.DECIDED
+        case.status = CaseStatus.IN_ANALYSIS
         case.version += 1
         case.updatedAt = now
         recordCaseStatusChanged(
@@ -366,10 +378,59 @@ class CaseService(
             actor = command.actor,
             correlationId = command.correlationId,
             now = now,
-            summaryCode = "CASE_DECIDED_AFTER_SECOND_APPROVAL",
+            summaryCode = "CASE_RETURNED_TO_ANALYSIS_AFTER_SECOND_APPROVAL",
         )
 
         return CaseCommandResultView.from(case, availableActions(case))
+    }
+
+    @Transactional
+    fun complete(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        ensureStatus(case, CaseStatus.IN_ANALYSIS)
+        ensureEvidenceReady(case)
+        ensureNoPendingDecisionApproval(case)
+        ensureMinimumDecisions(case)
+
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+        case.status = CaseStatus.DECIDED
+        case.version += 1
+        case.updatedAt = now
+
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = "CASE_COMPLETED",
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = command.actor.role.name,
+                actorId = command.actor.id,
+                summaryCode = "CASE_COMPLETED_EXPLICITLY",
+                objectType = "Case",
+                objectId = case.id,
+                objectVersion = case.version.toString(),
+                correlationId = command.correlationId,
+                causationId = null,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+        recordCaseStatusChanged(case, previousStatus, command.actor, command.correlationId, now, "CASE_DECIDED")
+
+        return CaseCommandResultView.from(case, availableActions(case))
+    }
+
+    @Transactional
+    fun retryRequirement(caseId: String, command: RetryRequirementCommand): EvidenceMatrixView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        return evidenceService.retryRequirement(
+            caseId = case.id,
+            requirementId = command.requirementId,
+            expectedRevision = command.expectedEvidenceRevision,
+            correlationId = command.correlationId,
+        )
     }
 
     @Transactional
@@ -630,9 +691,45 @@ class CaseService(
     private fun availableActions(case: CaseEntity): List<CaseAction> = when (case.status) {
         CaseStatus.OPEN -> listOf(CaseAction.ASSIGN)
         CaseStatus.ASSIGNED -> listOf(CaseAction.START_ANALYSIS, CaseAction.RETURN_TO_QUEUE)
-        CaseStatus.IN_ANALYSIS -> listOf(CaseAction.RETURN_TO_QUEUE)
+        CaseStatus.IN_ANALYSIS -> listOf(CaseAction.RETURN_TO_QUEUE, CaseAction.COMPLETE_CASE)
         CaseStatus.PENDING_APPROVAL -> listOf(CaseAction.APPROVE_DECISION)
         else -> emptyList()
+    }
+
+    private fun ensureNoPendingDecisionApproval(case: CaseEntity) {
+        val pendingSuspicion = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+            ?.approvalStatus == DecisionApprovalStatus.PENDING_APPROVAL
+        val pendingAccount = accountDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+            ?.approvalStatus == DecisionApprovalStatus.PENDING_APPROVAL
+        if (pendingSuspicion || pendingAccount) {
+            throw InvalidCaseTransitionException(case.id, case.status)
+        }
+    }
+
+    private fun ensureMinimumDecisions(case: CaseEntity) {
+        val suspicionDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+        if (suspicionDecision == null || suspicionDecision.approvalStatus != DecisionApprovalStatus.APPROVED) {
+            throw CaseCompletionBlockedException(case.id, listOf("SUSPICION_DECISION_REQUIRED"))
+        }
+    }
+
+    private fun ensureEvidenceReady(case: CaseEntity) {
+        val readiness = evidenceService.decisionReadiness(case.id)
+        if (!readiness.allowed) {
+            throw EvidenceRequirementsBlockedException(readiness.blockingReasons)
+        }
+    }
+
+    private fun completionReadiness(case: CaseEntity, decisionReadiness: ReadinessView): ReadinessView {
+        val reasons = decisionReadiness.blockingReasons.toMutableList()
+        val suspicionDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+        if (suspicionDecision == null || suspicionDecision.approvalStatus != DecisionApprovalStatus.APPROVED) {
+            reasons += "SUSPICION_DECISION_REQUIRED"
+        }
+        if (case.status == CaseStatus.PENDING_APPROVAL) {
+            reasons += "DECISION_APPROVAL_PENDING"
+        }
+        return ReadinessView(allowed = reasons.isEmpty(), blockingReasons = reasons)
     }
 
     private fun priorityFrom(severity: String): CasePriority = when (severity) {
@@ -685,6 +782,15 @@ class CaseService(
 
     companion object {
         const val GROUPING_POLICY_VERSION = "transaction-alert-grouping-1"
+
+        private val ACTIVE_CASE_STATUSES = listOf(
+            CaseStatus.OPEN,
+            CaseStatus.ASSIGNED,
+            CaseStatus.IN_ANALYSIS,
+            CaseStatus.WAITING_INFORMATION,
+            CaseStatus.WAITING_TECHNICAL,
+            CaseStatus.PENDING_APPROVAL,
+        )
     }
 }
 
@@ -717,6 +823,9 @@ data class CaseDetailView(
     val comments: List<CaseCommentView>,
     val suspicionDecisions: List<SuspicionDecisionView>,
     val accountDecisions: List<AccountDecisionView>,
+    val evidenceMatrix: EvidenceMatrixView,
+    val decisionReadiness: ReadinessView,
+    val completionReadiness: ReadinessView,
     val timeline: TimelineView,
     val availableActions: List<CaseAction>,
 )
@@ -759,6 +868,13 @@ data class AddCaseCommentCommand(
     val actor: Actor,
     val correlationId: String,
     val body: String,
+)
+
+data class RetryRequirementCommand(
+    val actor: Actor,
+    val correlationId: String,
+    val requirementId: String,
+    val expectedEvidenceRevision: Int,
 )
 
 data class IssueSuspicionDecisionCommand(
@@ -955,3 +1071,6 @@ class InvalidCaseTransitionException(caseId: String, status: CaseStatus) :
 
 class DecisionApprovalConflictException(actorId: String) :
     RuntimeException("Decision approval requires a different actor than $actorId")
+
+class CaseCompletionBlockedException(caseId: String, reasons: List<String>) :
+    RuntimeException("Case $caseId completion blocked: ${reasons.joinToString(",")}")

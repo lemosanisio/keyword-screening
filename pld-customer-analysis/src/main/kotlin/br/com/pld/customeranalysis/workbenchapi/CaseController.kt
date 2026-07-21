@@ -10,13 +10,20 @@ import br.com.pld.customeranalysis.casemanagement.CaseNotFoundException
 import br.com.pld.customeranalysis.casemanagement.CaseQueueView
 import br.com.pld.customeranalysis.casemanagement.CaseService
 import br.com.pld.customeranalysis.casemanagement.CaseVersionConflictException
+import br.com.pld.customeranalysis.casemanagement.CaseCompletionBlockedException
 import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
 import br.com.pld.customeranalysis.casemanagement.DecisionApprovalConflictException
 import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
 import br.com.pld.customeranalysis.casemanagement.IssueAccountDecisionCommand
 import br.com.pld.customeranalysis.casemanagement.IssueSuspicionDecisionCommand
+import br.com.pld.customeranalysis.casemanagement.RetryRequirementCommand
 import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionValue
 import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionView
+import br.com.pld.customeranalysis.evidence.EvidenceMatrixView
+import br.com.pld.customeranalysis.evidence.EvidenceRequirementsBlockedException
+import br.com.pld.customeranalysis.evidence.EvidenceRevisionConflictException
+import br.com.pld.customeranalysis.evidence.RequirementNotFoundException
+import br.com.pld.customeranalysis.evidence.RequirementRetryNotAllowedException
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
@@ -158,6 +165,36 @@ class CaseController(
         command(request, actorId, actorRole, correlationId),
     )
 
+    @PostMapping("/{caseId}/complete")
+    fun complete(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: CaseTransitionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): CaseCommandResultView = caseService.complete(
+        caseId,
+        command(request, actorId, actorRole, correlationId),
+    )
+
+    @PostMapping("/{caseId}/requirements/{requirementId}/retry")
+    fun retryRequirement(
+        @PathVariable caseId: String,
+        @PathVariable requirementId: String,
+        @Valid @RequestBody request: RetryRequirementRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): EvidenceMatrixView = caseService.retryRequirement(
+        caseId,
+        RetryRequirementCommand(
+            actor = actorResolver.commandActor(actorId, actorRole),
+            correlationId = actorResolver.correlationId(correlationId),
+            requirementId = requirementId,
+            expectedEvidenceRevision = request.expectedEvidenceRevision,
+        ),
+    )
+
     private fun command(
         request: CaseTransitionRequest,
         actorId: String?,
@@ -174,10 +211,17 @@ class CaseController(
 
     @ExceptionHandler(
         CaseVersionConflictException::class,
+        CaseCompletionBlockedException::class,
+        EvidenceRequirementsBlockedException::class,
+        EvidenceRevisionConflictException::class,
         InvalidCaseTransitionException::class,
         DecisionApprovalConflictException::class,
+        RequirementRetryNotAllowedException::class,
     )
     fun conflict(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.CONFLICT).build()
+
+    @ExceptionHandler(RequirementNotFoundException::class)
+    fun requirementNotFound(): ResponseEntity<Void> = ResponseEntity.notFound().build()
 }
 
 data class CaseTransitionRequest(
@@ -188,6 +232,11 @@ data class CaseTransitionRequest(
 data class AddCaseCommentRequest(
     @field:NotBlank
     val body: String,
+)
+
+data class RetryRequirementRequest(
+    @field:Min(1)
+    val expectedEvidenceRevision: Int,
 )
 
 data class IssueSuspicionDecisionRequest(
