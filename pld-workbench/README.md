@@ -1,0 +1,15 @@
+# PLD Workbench
+
+Frontend exploratório para testar a experiência do analista PLD sobre o `pld-customer-analysis`.
+
+Este projeto usa React, TypeScript, Bun, Tailwind e componentes no estilo shadcn/ui. Ele é uma demo de aprendizado arquitetural e produto, não uma implementação pronta para produção.
+
+## Scripts
+
+```bash
+bun install
+bun run build
+bun run dev
+```
+
+O ambiente atual precisa ter Bun instalado. O backend esperado é o `pld-customer-analysis` em `http://localhost:8080`. Para apontar para outro backend, ajuste `globalThis.PLD_API_BASE_URL` em `index.html` neste protótipo.

@@ -14,6 +14,11 @@ out/
 *.class
 bin/
 
+# Frontend
+node_modules/
+pld-workbench/dist/
+pld-workbench/.bun/
+
 # OS
 .DS_Store
 Thumbs.db

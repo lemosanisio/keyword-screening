@@ -29,7 +29,7 @@ Monorepo da plataforma PLD:
 |---------|-----------|
 | `pld-transaction-screening/` | API Kotlin/Spring — screening de transações PIX |
 | `pld-customer-analysis/` | Novo backend de análise de clientes (requisitos em `pld-customer-analysis/docs/`) |
-| `pld-workbench/` | Frontend React (a partir do Marco 4 do plano de expansão) |
+| `pld-workbench/` | Frontend React exploratório do Marco 4, com Bun, Tailwind e shadcn/ui |
 | `pld-platform-docs/` | Arquitetura, requisitos e contratos compartilhados da plataforma |
 | `docker-compose.yml` | Infraestrutura compartilhada (Postgres) |
 | `docs/` | Documentação da plataforma |

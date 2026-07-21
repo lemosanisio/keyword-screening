@@ -3,6 +3,8 @@
 Status: baseline de planejamento `v0.1`  
 Escopo: análise de PLD do onboarding à revisão contínua, investigação transacional, decisão sobre relacionamento, dossiê regulatório e comunicação ao COAF.
 
+Este monorepo é um protótipo exploratório isolado. O objetivo é testar ideias de domínio, arquitetura, contratos, workflow humano e experiência de produto antes de propor uma implementação real. O código deve ser limpo e intencional, mas entidades, banco de dados, integrações e fluxos aqui não representam necessariamente o modelo produtivo usado no trabalho.
+
 Este pacote define um produto único para o analista, implementado em três aplicações independentes que vivem em um único repositório Git (monorepo, ver [ADR-004](adr/ADR-004-monorepo-layout.md)). Ele não transforma as três aplicações em um monólito nem distribui a mesma regra de negócio entre serviços.
 
 ## Resultado esperado
@@ -81,6 +83,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [Marco 1 — tasks](marco-1-tasks.md)
 - [Marco 2 — tasks](marco-2-tasks.md)
 - [Marco 3 — tasks](marco-3-tasks.md)
+- [Marco 4 — tasks](marco-4-tasks.md)
 - [Handoff para o agente local](agent-handoff.md)
 
 ## Ordem recomendada de implementação
