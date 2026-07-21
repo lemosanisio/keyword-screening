@@ -78,6 +78,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [ADR-008 — escopo do Marco 1 e ordenação de filas](adr/ADR-008-marco-1-scope-and-queue-ordering.md)
 - [Decisões pendentes](open-decisions.md)
 - [Marco 0 — tasks](marco-0-tasks.md)
+- [Marco 1 — tasks](marco-1-tasks.md)
 - [Handoff para o agente local](agent-handoff.md)
 
 ## Ordem recomendada de implementação
