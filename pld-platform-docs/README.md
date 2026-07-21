@@ -80,6 +80,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [Marco 0 — tasks](marco-0-tasks.md)
 - [Marco 1 — tasks](marco-1-tasks.md)
 - [Marco 2 — tasks](marco-2-tasks.md)
+- [Marco 3 — tasks](marco-3-tasks.md)
 - [Handoff para o agente local](agent-handoff.md)
 
 ## Ordem recomendada de implementação

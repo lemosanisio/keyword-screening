@@ -1,5 +1,7 @@
 package br.com.pld.customeranalysis.workbenchapi
 
+import br.com.pld.customeranalysis.casemanagement.AddCaseCommentCommand
+import br.com.pld.customeranalysis.casemanagement.CaseCommentView
 import br.com.pld.customeranalysis.casemanagement.CaseDetailView
 import br.com.pld.customeranalysis.casemanagement.CaseCommandResultView
 import br.com.pld.customeranalysis.casemanagement.CaseNotFoundException
@@ -10,6 +12,7 @@ import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
 import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 
 @RestController
 @RequestMapping("/v1/cases")
@@ -60,6 +64,28 @@ class CaseController(
         @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
     ): CaseCommandResultView = caseService.returnToQueue(caseId, command(request, actorId, actorRole, correlationId))
 
+    @PostMapping("/{caseId}/comments")
+    fun addComment(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: AddCaseCommentRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): ResponseEntity<CaseCommentView> {
+        val comment = caseService.addComment(
+            caseId,
+            AddCaseCommentCommand(
+                actor = actorResolver.commandActor(actorId, actorRole),
+                correlationId = actorResolver.correlationId(correlationId),
+                body = request.body,
+            ),
+        )
+
+        return ResponseEntity
+            .created(URI.create("/v1/cases/$caseId/comments/${comment.commentId}"))
+            .body(comment)
+    }
+
     private fun command(
         request: CaseTransitionRequest,
         actorId: String?,
@@ -81,4 +107,9 @@ class CaseController(
 data class CaseTransitionRequest(
     @field:Min(1)
     val expectedVersion: Int,
+)
+
+data class AddCaseCommentRequest(
+    @field:NotBlank
+    val body: String,
 )

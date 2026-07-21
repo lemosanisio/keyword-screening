@@ -43,7 +43,7 @@ class TransactionSignalCaseIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -210,6 +210,37 @@ class TransactionSignalCaseIntegrationTest {
         }.andExpect {
             status { isConflict() }
         }
+    }
+
+    @Test
+    fun `adds comment to case workspace and timeline`() {
+        val partyId = createParty()
+        transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
+        val caseId = cases().single().caseId
+
+        mockMvc.post("/v1/cases/{caseId}/comments", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-case-comment")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"body":"Cliente movimentou valor incompatível com perfil esperado."}"""
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.commentId") { value(org.hamcrest.Matchers.startsWith("cmt_")) }
+            jsonPath("$.body") { value("Cliente movimentou valor incompatível com perfil esperado.") }
+            jsonPath("$.createdByActorId") { value("analyst-1") }
+            jsonPath("$.createdByActorRole") { value("ANALYST") }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.comments.length()") { value(1) }
+                jsonPath("$.comments[0].body") { value("Cliente movimentou valor incompatível com perfil esperado.") }
+                jsonPath("$.comments[0].createdByActorId") { value("analyst-1") }
+                jsonPath("$.timeline.entries[3].entryType") { value("CASE_COMMENT_ADDED") }
+                jsonPath("$.timeline.entries[3].summaryCode") { value("CASE_COMMENT_ADDED") }
+            }
     }
 
     private fun createParty(): String = partyService.create(

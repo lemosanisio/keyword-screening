@@ -22,3 +22,7 @@ interface CaseSourceJpaRepository : JpaRepository<CaseSourceEntity, String> {
 
     fun findByCaseIdOrderByAttachedAtAsc(caseId: String): List<CaseSourceEntity>
 }
+
+interface CaseCommentJpaRepository : JpaRepository<CaseCommentEntity, String> {
+    fun findByCaseIdOrderByCreatedAtAsc(caseId: String): List<CaseCommentEntity>
+}

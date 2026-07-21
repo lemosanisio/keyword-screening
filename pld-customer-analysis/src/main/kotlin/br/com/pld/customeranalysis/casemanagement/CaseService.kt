@@ -21,6 +21,7 @@ import java.time.Instant
 class CaseService(
     private val caseRepository: CaseJpaRepository,
     private val caseSourceRepository: CaseSourceJpaRepository,
+    private val caseCommentRepository: CaseCommentJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val partyService: PartyService,
     private val timelineService: TimelineService,
@@ -92,9 +93,49 @@ class CaseService(
             party = partyService.get(case.partyId),
             sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id)
                 .map { CaseSourceView.from(it, objectMapper) },
+            comments = caseCommentRepository.findByCaseIdOrderByCreatedAtAsc(case.id).map(CaseCommentView::from),
             timeline = timelineService.getByPartyId(case.partyId),
             availableActions = availableActions(case),
         )
+    }
+
+    @Transactional
+    fun addComment(caseId: String, command: AddCaseCommentCommand): CaseCommentView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        val now = Instant.now(clock)
+        val comment = caseCommentRepository.save(
+            CaseCommentEntity(
+                id = PrefixedUlid.next("cmt_"),
+                caseId = case.id,
+                partyId = case.partyId,
+                body = command.body.trim(),
+                createdByActorId = command.actor.id,
+                createdByActorRole = command.actor.role.name,
+                correlationId = command.correlationId,
+                createdAt = now,
+            ),
+        )
+
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = "CASE_COMMENT_ADDED",
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = command.actor.role.name,
+                actorId = command.actor.id,
+                summaryCode = "CASE_COMMENT_ADDED",
+                objectType = "CaseComment",
+                objectId = comment.id,
+                objectVersion = "1",
+                correlationId = command.correlationId,
+                causationId = case.id,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        return CaseCommentView.from(comment)
     }
 
     @Transactional
@@ -306,6 +347,7 @@ data class CaseDetailView(
     val case: CaseView,
     val party: PartyView,
     val sources: List<CaseSourceView>,
+    val comments: List<CaseCommentView>,
     val timeline: TimelineView,
     val availableActions: List<CaseAction>,
 )
@@ -343,6 +385,34 @@ data class ChangeCaseStatusCommand(
     val correlationId: String,
     val expectedVersion: Int,
 )
+
+data class AddCaseCommentCommand(
+    val actor: Actor,
+    val correlationId: String,
+    val body: String,
+)
+
+data class CaseCommentView(
+    val commentId: String,
+    val caseId: String,
+    val body: String,
+    val createdByActorId: String,
+    val createdByActorRole: String,
+    val correlationId: String,
+    val createdAt: Instant,
+) {
+    companion object {
+        fun from(entity: CaseCommentEntity): CaseCommentView = CaseCommentView(
+            commentId = entity.id,
+            caseId = entity.caseId,
+            body = entity.body,
+            createdByActorId = entity.createdByActorId,
+            createdByActorRole = entity.createdByActorRole,
+            correlationId = entity.correlationId,
+            createdAt = entity.createdAt,
+        )
+    }
+}
 
 data class CaseCommandResultView(
     val caseId: String,
