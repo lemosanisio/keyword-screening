@@ -11,11 +11,12 @@ Escopo: iniciar a fila humana única com casos transacionais derivados dos sinai
 - [x] Agrupamento de novos sinais transacionais no caso aberto da mesma `Party` pela política `transaction-alert-grouping-1`.
 - [x] Timeline `CASE_CREATED` e outbox `CaseStatusChanged` na criação de caso.
 - [x] API mínima de fila: `GET /v1/cases`.
+- [x] API mínima de detalhe: `GET /v1/cases/{caseId}` com Party, fontes anexadas e timeline.
 
 ## Próximo corte
 
 - [ ] Persistir/projetar detalhes mínimos do sinal transacional para o workspace do caso.
-- [ ] Expor `GET /v1/cases/{caseId}` com contexto mínimo: Party, fontes/sinais, timeline e ações disponíveis.
+- [ ] Incluir ações disponíveis no workspace conforme status/perfil.
 - [ ] Implementar assumir/devolver caso (`ASSIGNED`/`OPEN`) com versionamento simples.
 - [ ] Emitir `CaseStatusChanged.v1` nas transições operacionais.
 

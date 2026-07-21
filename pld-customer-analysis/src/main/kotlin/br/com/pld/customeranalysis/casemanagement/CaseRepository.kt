@@ -19,4 +19,6 @@ interface CaseSourceJpaRepository : JpaRepository<CaseSourceEntity, String> {
         sourceId: String,
         groupingPolicyVersion: String,
     ): Boolean
+
+    fun findByCaseIdOrderByAttachedAtAsc(caseId: String): List<CaseSourceEntity>
 }

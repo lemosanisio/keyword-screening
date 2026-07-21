@@ -75,6 +75,28 @@ class TransactionSignalCaseIntegrationTest {
                 jsonPath("$.cases[0].origin") { value("TRANSACTION_ALERT") }
                 jsonPath("$.cases[0].status") { value("OPEN") }
             }
+
+        mockMvc.get("/v1/cases/{caseId}", cases.single().caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.case.caseId") { value(cases.single().caseId) }
+                jsonPath("$.case.partyId") { value(partyId) }
+                jsonPath("$.party.currentSnapshot.officialName") { value("Maria Exemplo da Silva") }
+                jsonPath("$.sources.length()") { value(1) }
+                jsonPath("$.sources[0].sourceId") { value("sig_01J6ZK7Q3W8K0M2N4P6R8T0V2F") }
+                jsonPath("$.sources[0].sourceType") { value("TransactionSignal") }
+                jsonPath("$.sources[0].severity") { value("HIGH") }
+                jsonPath("$.timeline.entries.length()") { value(3) }
+                jsonPath("$.timeline.entries[2].entryType") { value("CASE_CREATED") }
+            }
+    }
+
+    @Test
+    fun `returns not found for unknown case`() {
+        mockMvc.get("/v1/cases/{caseId}", "cas_01J6ZK7Q3W8K0M2N4P6R8T0BAD")
+            .andExpect {
+                status { isNotFound() }
+            }
     }
 
     @Test

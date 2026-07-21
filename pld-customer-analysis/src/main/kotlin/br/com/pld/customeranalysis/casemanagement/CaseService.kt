@@ -2,8 +2,13 @@ package br.com.pld.customeranalysis.casemanagement
 
 import br.com.pld.customeranalysis.common.PrefixedUlid
 import br.com.pld.customeranalysis.integration.OutboxService
+import br.com.pld.customeranalysis.party.PartyService
+import br.com.pld.customeranalysis.party.PartyView
+import br.com.pld.customeranalysis.timeline.TimelineEntryView
 import br.com.pld.customeranalysis.timeline.TimelineEntryEntity
 import br.com.pld.customeranalysis.timeline.TimelineEntryJpaRepository
+import br.com.pld.customeranalysis.timeline.TimelineService
+import br.com.pld.customeranalysis.timeline.TimelineView
 import br.com.pld.customeranalysis.timeline.VisibilityClassification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -15,6 +20,8 @@ class CaseService(
     private val caseRepository: CaseJpaRepository,
     private val caseSourceRepository: CaseSourceJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
+    private val partyService: PartyService,
+    private val timelineService: TimelineService,
     private val outboxService: OutboxService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -66,6 +73,18 @@ class CaseService(
     fun queue(): CaseQueueView = CaseQueueView(
         cases = caseRepository.findByStatusOrderByCreatedAtAsc(CaseStatus.OPEN).map(CaseView::from),
     )
+
+    @Transactional(readOnly = true)
+    fun get(caseId: String): CaseDetailView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+
+        return CaseDetailView(
+            case = CaseView.from(case),
+            party = partyService.get(case.partyId),
+            sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id).map(CaseSourceView::from),
+            timeline = timelineService.getByPartyId(case.partyId),
+        )
+    }
 
     private fun createCase(command: RecordTransactionSignalCaseCommand, now: Instant): CaseEntity {
         val case = caseRepository.save(
@@ -148,6 +167,13 @@ data class CaseQueueView(
     val cases: List<CaseView>,
 )
 
+data class CaseDetailView(
+    val case: CaseView,
+    val party: PartyView,
+    val sources: List<CaseSourceView>,
+    val timeline: TimelineView,
+)
+
 data class CaseView(
     val caseId: String,
     val partyId: String,
@@ -171,3 +197,29 @@ data class CaseView(
         )
     }
 }
+
+data class CaseSourceView(
+    val sourceId: String,
+    val sourceSystem: String,
+    val sourceType: String,
+    val severity: String,
+    val reasonCode: String,
+    val correlationId: String,
+    val causationId: String,
+    val attachedAt: Instant,
+) {
+    companion object {
+        fun from(entity: CaseSourceEntity): CaseSourceView = CaseSourceView(
+            sourceId = entity.sourceId,
+            sourceSystem = entity.sourceSystem,
+            sourceType = entity.sourceType,
+            severity = entity.severity,
+            reasonCode = entity.reasonCode,
+            correlationId = entity.correlationId,
+            causationId = entity.causationId,
+            attachedAt = entity.attachedAt,
+        )
+    }
+}
+
+class CaseNotFoundException(caseId: String) : RuntimeException("Case not found: $caseId")
