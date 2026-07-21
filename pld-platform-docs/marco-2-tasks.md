@@ -1,6 +1,6 @@
 # Marco 2 — case transacional mínimo
 
-Status: em andamento  
+Status: concluído  
 Escopo: iniciar a fila humana única com casos transacionais derivados dos sinais já consumidos pelo `pld-customer-analysis`.
 
 ## Concluído
@@ -13,12 +13,13 @@ Escopo: iniciar a fila humana única com casos transacionais derivados dos sinai
 - [x] API mínima de fila: `GET /v1/cases`.
 - [x] API mínima de detalhe: `GET /v1/cases/{caseId}` com Party, fontes anexadas e timeline.
 - [x] Projeção mínima de sinal transacional no workspace: avaliação, transação, tipo, rota, versão de risco e regras acionadas.
+- [x] Ações disponíveis no workspace conforme status.
+- [x] Transições operacionais `ASSIGN`, `START_ANALYSIS` e `RETURN_TO_QUEUE` com versionamento simples.
+- [x] Timeline e outbox `CaseStatusChanged.v1` nas transições operacionais.
 
-## Próximo corte
+## Encerramento
 
-- [ ] Incluir ações disponíveis no workspace conforme status/perfil.
-- [ ] Implementar assumir/devolver caso (`ASSIGNED`/`OPEN`) com versionamento simples.
-- [ ] Emitir `CaseStatusChanged.v1` nas transições operacionais.
+- Marco 2 fechado como caso transacional mínimo. Próximo marco deve iniciar comentários/anexos ou decisão humana, conforme prioridade de produto.
 
 ## Fora deste corte inicial
 

@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -81,6 +82,8 @@ class TransactionSignalCaseIntegrationTest {
                 status { isOk() }
                 jsonPath("$.case.caseId") { value(cases.single().caseId) }
                 jsonPath("$.case.partyId") { value(partyId) }
+                jsonPath("$.case.version") { value(1) }
+                jsonPath("$.availableActions") { value(org.hamcrest.Matchers.contains("ASSIGN")) }
                 jsonPath("$.party.currentSnapshot.officialName") { value("Maria Exemplo da Silva") }
                 jsonPath("$.sources.length()") { value(1) }
                 jsonPath("$.sources[0].sourceId") { value("sig_01J6ZK7Q3W8K0M2N4P6R8T0V2F") }
@@ -129,6 +132,86 @@ class TransactionSignalCaseIntegrationTest {
         )
     }
 
+    @Test
+    fun `assigns starts analysis and returns case to queue with status events`() {
+        val partyId = createParty()
+        transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
+        val caseId = cases().single().caseId
+
+        mockMvc.post("/v1/cases/{caseId}/assign", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-case-assign")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":1}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("ASSIGNED") }
+            jsonPath("$.assignedActorId") { value("analyst-1") }
+            jsonPath("$.version") { value(2) }
+            jsonPath("$.availableActions") {
+                value(org.hamcrest.Matchers.containsInAnyOrder("START_ANALYSIS", "RETURN_TO_QUEUE"))
+            }
+        }
+
+        mockMvc.post("/v1/cases/{caseId}/start-analysis", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-case-start-analysis")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":2}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("IN_ANALYSIS") }
+            jsonPath("$.assignedActorId") { value("analyst-1") }
+            jsonPath("$.version") { value(3) }
+            jsonPath("$.availableActions") { value(org.hamcrest.Matchers.contains("RETURN_TO_QUEUE")) }
+        }
+
+        mockMvc.post("/v1/cases/{caseId}/return-to-queue", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-case-return")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":3}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("OPEN") }
+            jsonPath("$.assignedActorId") { doesNotExist() }
+            jsonPath("$.version") { value(4) }
+            jsonPath("$.availableActions") { value(org.hamcrest.Matchers.contains("ASSIGN")) }
+        }
+
+        assertThat(statusTimelineEntries(partyId)).containsExactly(
+            "CASE_CREATED_FROM_TRANSACTION_SIGNAL",
+            "CASE_ASSIGNED",
+            "CASE_IN_ANALYSIS",
+            "CASE_RETURNED_TO_QUEUE",
+        )
+        assertThat(outboxEventTypes()).containsExactly(
+            "PartyCreated",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+        )
+    }
+
+    @Test
+    fun `rejects case transition with stale version`() {
+        createParty().also { partyId -> transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId)) }
+        val caseId = cases().single().caseId
+
+        mockMvc.post("/v1/cases/{caseId}/assign", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":99}"""
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
     private fun createParty(): String = partyService.create(
         CreatePartyCommand(
             partyType = PartyType.PERSON,
@@ -159,6 +242,12 @@ class TransactionSignalCaseIntegrationTest {
 
     private fun timelineEntryTypes(partyId: String): List<String> = jdbcTemplate.queryForList(
         "select entry_type from timeline_entry where party_id = ? order by recorded_at, id",
+        String::class.java,
+        partyId,
+    )
+
+    private fun statusTimelineEntries(partyId: String): List<String> = jdbcTemplate.queryForList(
+        "select summary_code from timeline_entry where party_id = ? and object_type = 'Case' order by recorded_at, id",
         String::class.java,
         partyId,
     )

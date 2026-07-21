@@ -30,6 +30,8 @@ class CaseEntity(
 
     var sourceCount: Int = 0,
 
+    var version: Int = 1,
+
     var assignedActorId: String? = null,
 
     var createdAt: Instant = Instant.EPOCH,

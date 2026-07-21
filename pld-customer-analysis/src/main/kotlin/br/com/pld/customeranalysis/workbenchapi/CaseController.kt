@@ -1,13 +1,23 @@
 package br.com.pld.customeranalysis.workbenchapi
 
 import br.com.pld.customeranalysis.casemanagement.CaseDetailView
+import br.com.pld.customeranalysis.casemanagement.CaseCommandResultView
 import br.com.pld.customeranalysis.casemanagement.CaseNotFoundException
 import br.com.pld.customeranalysis.casemanagement.CaseQueueView
 import br.com.pld.customeranalysis.casemanagement.CaseService
+import br.com.pld.customeranalysis.casemanagement.CaseVersionConflictException
+import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
+import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -15,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/v1/cases")
 class CaseController(
     private val caseService: CaseService,
+    private val actorResolver: ActorResolver,
 ) {
     @GetMapping
     fun queue(): CaseQueueView = caseService.queue()
@@ -22,6 +33,52 @@ class CaseController(
     @GetMapping("/{caseId}")
     fun get(@PathVariable caseId: String): CaseDetailView = caseService.get(caseId)
 
+    @PostMapping("/{caseId}/assign")
+    fun assign(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: CaseTransitionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): CaseCommandResultView = caseService.assign(caseId, command(request, actorId, actorRole, correlationId))
+
+    @PostMapping("/{caseId}/start-analysis")
+    fun startAnalysis(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: CaseTransitionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): CaseCommandResultView = caseService.startAnalysis(caseId, command(request, actorId, actorRole, correlationId))
+
+    @PostMapping("/{caseId}/return-to-queue")
+    fun returnToQueue(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: CaseTransitionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): CaseCommandResultView = caseService.returnToQueue(caseId, command(request, actorId, actorRole, correlationId))
+
+    private fun command(
+        request: CaseTransitionRequest,
+        actorId: String?,
+        actorRole: String?,
+        correlationId: String?,
+    ): ChangeCaseStatusCommand = ChangeCaseStatusCommand(
+        actor = actorResolver.commandActor(actorId, actorRole),
+        correlationId = actorResolver.correlationId(correlationId),
+        expectedVersion = request.expectedVersion,
+    )
+
     @ExceptionHandler(CaseNotFoundException::class)
     fun notFound(): ResponseEntity<Void> = ResponseEntity.notFound().build()
+
+    @ExceptionHandler(CaseVersionConflictException::class, InvalidCaseTransitionException::class)
+    fun conflict(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.CONFLICT).build()
 }
+
+data class CaseTransitionRequest(
+    @field:Min(1)
+    val expectedVersion: Int,
+)

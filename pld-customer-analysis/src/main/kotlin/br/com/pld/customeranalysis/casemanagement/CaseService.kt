@@ -1,10 +1,10 @@
 package br.com.pld.customeranalysis.casemanagement
 
 import br.com.pld.customeranalysis.common.PrefixedUlid
+import br.com.pld.customeranalysis.identityaccess.Actor
 import br.com.pld.customeranalysis.integration.OutboxService
 import br.com.pld.customeranalysis.party.PartyService
 import br.com.pld.customeranalysis.party.PartyView
-import br.com.pld.customeranalysis.timeline.TimelineEntryView
 import br.com.pld.customeranalysis.timeline.TimelineEntryEntity
 import br.com.pld.customeranalysis.timeline.TimelineEntryJpaRepository
 import br.com.pld.customeranalysis.timeline.TimelineService
@@ -93,7 +93,63 @@ class CaseService(
             sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id)
                 .map { CaseSourceView.from(it, objectMapper) },
             timeline = timelineService.getByPartyId(case.partyId),
+            availableActions = availableActions(case),
         )
+    }
+
+    @Transactional
+    fun assign(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        ensureStatus(case, CaseStatus.OPEN)
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+
+        case.status = CaseStatus.ASSIGNED
+        case.assignedActorId = command.actor.id
+        case.version += 1
+        case.updatedAt = now
+
+        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_ASSIGNED")
+
+        return CaseCommandResultView.from(case, availableActions(case))
+    }
+
+    @Transactional
+    fun startAnalysis(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        ensureStatus(case, CaseStatus.ASSIGNED)
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+
+        case.status = CaseStatus.IN_ANALYSIS
+        case.version += 1
+        case.updatedAt = now
+
+        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_IN_ANALYSIS")
+
+        return CaseCommandResultView.from(case, availableActions(case))
+    }
+
+    @Transactional
+    fun returnToQueue(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        if (case.status != CaseStatus.ASSIGNED && case.status != CaseStatus.IN_ANALYSIS) {
+            throw InvalidCaseTransitionException(case.id, case.status)
+        }
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+
+        case.status = CaseStatus.OPEN
+        case.assignedActorId = null
+        case.version += 1
+        case.updatedAt = now
+
+        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_RETURNED_TO_QUEUE")
+
+        return CaseCommandResultView.from(case, availableActions(case))
     }
 
     private fun createCase(command: RecordTransactionSignalCaseCommand, now: Instant): CaseEntity {
@@ -107,6 +163,7 @@ class CaseService(
                 reasonCode = command.reasonCode,
                 groupingPolicyVersion = GROUPING_POLICY_VERSION,
                 sourceCount = 1,
+                version = 1,
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -149,6 +206,69 @@ class CaseService(
         return case
     }
 
+    private fun recordCaseStatusChanged(
+        case: CaseEntity,
+        previousStatus: CaseStatus,
+        command: ChangeCaseStatusCommand,
+        now: Instant,
+        summaryCode: String,
+    ) {
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = "CASE_STATUS_CHANGED",
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = command.actor.role.name,
+                actorId = command.actor.id,
+                summaryCode = summaryCode,
+                objectType = "Case",
+                objectId = case.id,
+                objectVersion = case.version.toString(),
+                correlationId = command.correlationId,
+                causationId = null,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        outboxService.append(
+            eventType = "CaseStatusChanged",
+            aggregateType = "Case",
+            aggregateId = case.id,
+            payload = mapOf(
+                "caseId" to case.id,
+                "partyId" to case.partyId,
+                "origin" to case.origin.name,
+                "previousStatus" to previousStatus.name,
+                "newStatus" to case.status.name,
+                "assignedActorId" to case.assignedActorId,
+                "reasonCode" to case.reasonCode,
+                "version" to case.version,
+                "correlationId" to command.correlationId,
+            ),
+        )
+    }
+
+    private fun ensureVersion(case: CaseEntity, expectedVersion: Int) {
+        if (case.version != expectedVersion) {
+            throw CaseVersionConflictException(case.id, expectedVersion, case.version)
+        }
+    }
+
+    private fun ensureStatus(case: CaseEntity, expectedStatus: CaseStatus) {
+        if (case.status != expectedStatus) {
+            throw InvalidCaseTransitionException(case.id, case.status)
+        }
+    }
+
+    private fun availableActions(case: CaseEntity): List<CaseAction> = when (case.status) {
+        CaseStatus.OPEN -> listOf(CaseAction.ASSIGN)
+        CaseStatus.ASSIGNED -> listOf(CaseAction.START_ANALYSIS, CaseAction.RETURN_TO_QUEUE)
+        CaseStatus.IN_ANALYSIS -> listOf(CaseAction.RETURN_TO_QUEUE)
+        else -> emptyList()
+    }
+
     private fun priorityFrom(severity: String): CasePriority = when (severity) {
         "CRITICAL" -> CasePriority.CRITICAL
         "HIGH" -> CasePriority.HIGH
@@ -187,6 +307,7 @@ data class CaseDetailView(
     val party: PartyView,
     val sources: List<CaseSourceView>,
     val timeline: TimelineView,
+    val availableActions: List<CaseAction>,
 )
 
 data class CaseView(
@@ -197,6 +318,8 @@ data class CaseView(
     val priority: CasePriority,
     val reasonCode: String,
     val sourceCount: Int,
+    val version: Int,
+    val assignedActorId: String?,
     val createdAt: Instant,
 ) {
     companion object {
@@ -208,7 +331,33 @@ data class CaseView(
             priority = entity.priority,
             reasonCode = entity.reasonCode,
             sourceCount = entity.sourceCount,
+            version = entity.version,
+            assignedActorId = entity.assignedActorId,
             createdAt = entity.createdAt,
+        )
+    }
+}
+
+data class ChangeCaseStatusCommand(
+    val actor: Actor,
+    val correlationId: String,
+    val expectedVersion: Int,
+)
+
+data class CaseCommandResultView(
+    val caseId: String,
+    val status: CaseStatus,
+    val assignedActorId: String?,
+    val version: Int,
+    val availableActions: List<CaseAction>,
+) {
+    companion object {
+        fun from(entity: CaseEntity, availableActions: List<CaseAction>): CaseCommandResultView = CaseCommandResultView(
+            caseId = entity.id,
+            status = entity.status,
+            assignedActorId = entity.assignedActorId,
+            version = entity.version,
+            availableActions = availableActions,
         )
     }
 }
@@ -256,3 +405,9 @@ data class RuleMatchView(
 )
 
 class CaseNotFoundException(caseId: String) : RuntimeException("Case not found: $caseId")
+
+class CaseVersionConflictException(caseId: String, expectedVersion: Int, actualVersion: Int) :
+    RuntimeException("Case $caseId version conflict: expected $expectedVersion but was $actualVersion")
+
+class InvalidCaseTransitionException(caseId: String, status: CaseStatus) :
+    RuntimeException("Invalid transition for case $caseId from status $status")

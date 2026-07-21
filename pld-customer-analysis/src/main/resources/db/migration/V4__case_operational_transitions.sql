@@ -1,0 +1,2 @@
+ALTER TABLE pld_case
+    ADD COLUMN version INTEGER NOT NULL DEFAULT 1;

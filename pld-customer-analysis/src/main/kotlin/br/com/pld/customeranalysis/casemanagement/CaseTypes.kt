@@ -22,3 +22,9 @@ enum class CasePriority {
     HIGH,
     CRITICAL,
 }
+
+enum class CaseAction {
+    ASSIGN,
+    START_ANALYSIS,
+    RETURN_TO_QUEUE,
+}
