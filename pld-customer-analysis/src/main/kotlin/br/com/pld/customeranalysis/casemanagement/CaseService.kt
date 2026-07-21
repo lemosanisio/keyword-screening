@@ -23,6 +23,7 @@ class CaseService(
     private val caseSourceRepository: CaseSourceJpaRepository,
     private val caseCommentRepository: CaseCommentJpaRepository,
     private val suspicionDecisionRepository: SuspicionDecisionJpaRepository,
+    private val accountDecisionRepository: AccountDecisionJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val partyService: PartyService,
     private val timelineService: TimelineService,
@@ -97,6 +98,8 @@ class CaseService(
             comments = caseCommentRepository.findByCaseIdOrderByCreatedAtAsc(case.id).map(CaseCommentView::from),
             suspicionDecisions = suspicionDecisionRepository.findByCaseIdOrderByDecisionVersionAsc(case.id)
                 .map { SuspicionDecisionView.from(it, objectMapper) },
+            accountDecisions = accountDecisionRepository.findByCaseIdOrderByDecisionVersionAsc(case.id)
+                .map { AccountDecisionView.from(it, objectMapper) },
             timeline = timelineService.getByPartyId(case.partyId),
             availableActions = availableActions(case),
         )
@@ -219,6 +222,86 @@ class CaseService(
         )
 
         return SuspicionDecisionView.from(decision, objectMapper)
+    }
+
+    @Transactional
+    fun issueAccountDecision(caseId: String, command: IssueAccountDecisionCommand): AccountDecisionView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        if (case.status != CaseStatus.IN_ANALYSIS) {
+            throw InvalidCaseTransitionException(case.id, case.status)
+        }
+
+        val previousDecision = accountDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+        val decision = accountDecisionRepository.save(
+            AccountDecisionEntity(
+                id = PrefixedUlid.next("adn_"),
+                caseId = case.id,
+                partyId = case.partyId,
+                decision = command.decision,
+                decisionVersion = (previousDecision?.decisionVersion ?: 0) + 1,
+                reasonCodes = objectMapper.writeValueAsString(command.reasonCodes),
+                narrative = command.narrative.trim(),
+                policyVersion = command.policyVersion,
+                decidedByActorId = command.actor.id,
+                decidedByActorRole = command.actor.role.name,
+                decidedAt = now,
+                correlationId = command.correlationId,
+                previousDecisionId = previousDecision?.id,
+            ),
+        )
+
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = "ACCOUNT_DECISION_ISSUED",
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = command.actor.role.name,
+                actorId = command.actor.id,
+                summaryCode = "ACCOUNT_DECISION_${command.decision.name}",
+                objectType = "AccountDecision",
+                objectId = decision.id,
+                objectVersion = decision.decisionVersion.toString(),
+                correlationId = command.correlationId,
+                causationId = case.id,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        outboxService.append(
+            eventType = "AccountDecisionIssued",
+            aggregateType = "AccountDecision",
+            aggregateId = decision.id,
+            payload = mapOf(
+                "decisionId" to decision.id,
+                "caseId" to case.id,
+                "partyId" to case.partyId,
+                "decision" to decision.decision.name,
+                "decisionVersion" to decision.decisionVersion,
+                "reasonCodes" to command.reasonCodes,
+                "policyVersion" to decision.policyVersion,
+                "previousDecisionId" to decision.previousDecisionId,
+                "correlationId" to command.correlationId,
+            ),
+        )
+
+        case.status = CaseStatus.DECIDED
+        case.version += 1
+        case.updatedAt = now
+        recordCaseStatusChanged(
+            case = case,
+            previousStatus = previousStatus,
+            actor = command.actor,
+            correlationId = command.correlationId,
+            now = now,
+            summaryCode = "CASE_DECIDED",
+        )
+
+        return AccountDecisionView.from(decision, objectMapper)
     }
 
     @Transactional
@@ -433,6 +516,7 @@ data class CaseDetailView(
     val sources: List<CaseSourceView>,
     val comments: List<CaseCommentView>,
     val suspicionDecisions: List<SuspicionDecisionView>,
+    val accountDecisions: List<AccountDecisionView>,
     val timeline: TimelineView,
     val availableActions: List<CaseAction>,
 )
@@ -482,6 +566,16 @@ data class IssueSuspicionDecisionCommand(
     val correlationId: String,
     val expectedVersion: Int,
     val decision: SuspicionDecisionValue,
+    val reasonCodes: List<String>,
+    val narrative: String,
+    val policyVersion: String,
+)
+
+data class IssueAccountDecisionCommand(
+    val actor: Actor,
+    val correlationId: String,
+    val expectedVersion: Int,
+    val decision: AccountDecisionValue,
     val reasonCodes: List<String>,
     val narrative: String,
     val policyVersion: String,
@@ -545,6 +639,41 @@ data class SuspicionDecisionView(
     companion object {
         fun from(entity: SuspicionDecisionEntity, objectMapper: ObjectMapper): SuspicionDecisionView =
             SuspicionDecisionView(
+                decisionId = entity.id,
+                caseId = entity.caseId,
+                partyId = entity.partyId,
+                decision = entity.decision,
+                decisionVersion = entity.decisionVersion,
+                reasonCodes = objectMapper.readTree(entity.reasonCodes),
+                narrative = entity.narrative,
+                policyVersion = entity.policyVersion,
+                decidedByActorId = entity.decidedByActorId,
+                decidedByActorRole = entity.decidedByActorRole,
+                decidedAt = entity.decidedAt,
+                correlationId = entity.correlationId,
+                previousDecisionId = entity.previousDecisionId,
+            )
+    }
+}
+
+data class AccountDecisionView(
+    val decisionId: String,
+    val caseId: String,
+    val partyId: String,
+    val decision: AccountDecisionValue,
+    val decisionVersion: Int,
+    val reasonCodes: JsonNode,
+    val narrative: String,
+    val policyVersion: String,
+    val decidedByActorId: String,
+    val decidedByActorRole: String,
+    val decidedAt: Instant,
+    val correlationId: String,
+    val previousDecisionId: String?,
+) {
+    companion object {
+        fun from(entity: AccountDecisionEntity, objectMapper: ObjectMapper): AccountDecisionView =
+            AccountDecisionView(
                 decisionId = entity.id,
                 caseId = entity.caseId,
                 partyId = entity.partyId,

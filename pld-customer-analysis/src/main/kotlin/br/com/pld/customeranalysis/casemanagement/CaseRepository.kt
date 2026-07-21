@@ -31,3 +31,8 @@ interface SuspicionDecisionJpaRepository : JpaRepository<SuspicionDecisionEntity
     fun findByCaseIdOrderByDecisionVersionAsc(caseId: String): List<SuspicionDecisionEntity>
     fun findTopByCaseIdOrderByDecisionVersionDesc(caseId: String): SuspicionDecisionEntity?
 }
+
+interface AccountDecisionJpaRepository : JpaRepository<AccountDecisionEntity, String> {
+    fun findByCaseIdOrderByDecisionVersionAsc(caseId: String): List<AccountDecisionEntity>
+    fun findTopByCaseIdOrderByDecisionVersionDesc(caseId: String): AccountDecisionEntity?
+}

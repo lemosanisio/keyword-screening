@@ -1,6 +1,8 @@
 package br.com.pld.customeranalysis.workbenchapi
 
 import br.com.pld.customeranalysis.casemanagement.AddCaseCommentCommand
+import br.com.pld.customeranalysis.casemanagement.AccountDecisionValue
+import br.com.pld.customeranalysis.casemanagement.AccountDecisionView
 import br.com.pld.customeranalysis.casemanagement.CaseCommentView
 import br.com.pld.customeranalysis.casemanagement.CaseDetailView
 import br.com.pld.customeranalysis.casemanagement.CaseCommandResultView
@@ -10,6 +12,7 @@ import br.com.pld.customeranalysis.casemanagement.CaseService
 import br.com.pld.customeranalysis.casemanagement.CaseVersionConflictException
 import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
 import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
+import br.com.pld.customeranalysis.casemanagement.IssueAccountDecisionCommand
 import br.com.pld.customeranalysis.casemanagement.IssueSuspicionDecisionCommand
 import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionValue
 import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionView
@@ -116,6 +119,32 @@ class CaseController(
             .body(decision)
     }
 
+    @PostMapping("/{caseId}/account-decisions")
+    fun issueAccountDecision(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: IssueAccountDecisionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): ResponseEntity<AccountDecisionView> {
+        val decision = caseService.issueAccountDecision(
+            caseId,
+            IssueAccountDecisionCommand(
+                actor = actorResolver.commandActor(actorId, actorRole),
+                correlationId = actorResolver.correlationId(correlationId),
+                expectedVersion = request.expectedVersion,
+                decision = request.decision,
+                reasonCodes = request.reasonCodes,
+                narrative = request.narrative,
+                policyVersion = request.policyVersion,
+            ),
+        )
+
+        return ResponseEntity
+            .created(URI.create("/v1/cases/$caseId/account-decisions/${decision.decisionId}"))
+            .body(decision)
+    }
+
     private fun command(
         request: CaseTransitionRequest,
         actorId: String?,
@@ -148,6 +177,18 @@ data class IssueSuspicionDecisionRequest(
     @field:Min(1)
     val expectedVersion: Int,
     val decision: SuspicionDecisionValue,
+    @field:NotEmpty
+    val reasonCodes: List<@NotBlank String>,
+    @field:NotBlank
+    val narrative: String,
+    @field:NotBlank
+    val policyVersion: String,
+)
+
+data class IssueAccountDecisionRequest(
+    @field:Min(1)
+    val expectedVersion: Int,
+    val decision: AccountDecisionValue,
     @field:NotEmpty
     val reasonCodes: List<@NotBlank String>,
     @field:NotBlank

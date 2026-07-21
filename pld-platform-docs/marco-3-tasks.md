@@ -8,11 +8,11 @@ Escopo: permitir trabalho humano auditável no caso antes das decisões formais 
 - [x] Comentários/anotações no caso com timeline.
 - [x] Exibir comentários no workspace do caso.
 - [x] Decisão de suspeição mínima com timeline e evento `SuspicionDecisionIssued.v1`.
+- [x] Decisão de relacionamento mínima com timeline e evento `AccountDecisionIssued.v1`.
 
 ## Próximo corte
 
-- [ ] Decisão de relacionamento mínima.
-- [ ] Evento `AccountDecisionIssued.v1`.
+- [ ] Revisão/validação humana secundária para decisões sensíveis.
 
 ## Fora deste corte inicial
 

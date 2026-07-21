@@ -35,3 +35,14 @@ enum class SuspicionDecisionValue {
     COMMUNICATE_TO_COAF,
     INCONCLUSIVE,
 }
+
+enum class AccountDecisionValue {
+    APPROVE,
+    APPROVE_WITH_CONDITIONS,
+    REQUEST_INFORMATION,
+    REJECT,
+    MAINTAIN,
+    RESTRICT,
+    SUSPEND,
+    TERMINATE_RELATIONSHIP,
+}

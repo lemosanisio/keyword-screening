@@ -43,7 +43,7 @@ class TransactionSignalCaseIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table account_decision, suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -291,6 +291,56 @@ class TransactionSignalCaseIntegrationTest {
             "CaseStatusChanged",
             "CaseStatusChanged",
             "SuspicionDecisionIssued",
+            "CaseStatusChanged",
+        )
+    }
+
+    @Test
+    fun `issues account decision and closes case as decided`() {
+        val partyId = createParty()
+        transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
+        val caseId = cases().single().caseId
+        assignAndStartAnalysis(caseId)
+
+        mockMvc.post("/v1/cases/{caseId}/account-decisions", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-account-decision")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "expectedVersion": 3,
+                  "decision": "MAINTAIN",
+                  "reasonCodes": ["TRANSACTION_SIGNAL_REVIEWED"],
+                  "narrative": "Sinal analisado e relacionamento pode ser mantido.",
+                  "policyVersion": "account-decision-policy-1"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("adn_")) }
+            jsonPath("$.caseId") { value(caseId) }
+            jsonPath("$.decision") { value("MAINTAIN") }
+            jsonPath("$.decisionVersion") { value(1) }
+            jsonPath("$.decidedByActorId") { value("analyst-1") }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.case.status") { value("DECIDED") }
+                jsonPath("$.case.version") { value(4) }
+                jsonPath("$.accountDecisions.length()") { value(1) }
+                jsonPath("$.accountDecisions[0].decision") { value("MAINTAIN") }
+            }
+
+        assertThat(timelineEntryTypes(partyId)).contains("ACCOUNT_DECISION_ISSUED")
+        assertThat(outboxEventTypes()).containsExactly(
+            "PartyCreated",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "AccountDecisionIssued",
             "CaseStatusChanged",
         )
     }
