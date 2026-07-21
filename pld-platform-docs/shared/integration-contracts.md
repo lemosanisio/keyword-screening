@@ -23,7 +23,6 @@ Status: proposta de contrato lógico `v1`. A serialização final pode ser JSON,
   "occurredAt": "2026-07-20T15:30:00Z",
   "publishedAt": "2026-07-20T15:30:01Z",
   "producer": "pld-customer-analysis",
-  "tenantId": "optional-if-multitenant",
   "correlationId": "01J...",
   "causationId": "01J...",
   "actor": {
