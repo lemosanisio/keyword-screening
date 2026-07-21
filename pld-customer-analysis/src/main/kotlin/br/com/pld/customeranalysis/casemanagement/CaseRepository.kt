@@ -26,3 +26,8 @@ interface CaseSourceJpaRepository : JpaRepository<CaseSourceEntity, String> {
 interface CaseCommentJpaRepository : JpaRepository<CaseCommentEntity, String> {
     fun findByCaseIdOrderByCreatedAtAsc(caseId: String): List<CaseCommentEntity>
 }
+
+interface SuspicionDecisionJpaRepository : JpaRepository<SuspicionDecisionEntity, String> {
+    fun findByCaseIdOrderByDecisionVersionAsc(caseId: String): List<SuspicionDecisionEntity>
+    fun findTopByCaseIdOrderByDecisionVersionDesc(caseId: String): SuspicionDecisionEntity?
+}

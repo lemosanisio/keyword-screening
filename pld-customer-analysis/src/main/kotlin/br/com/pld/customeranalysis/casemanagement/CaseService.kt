@@ -22,6 +22,7 @@ class CaseService(
     private val caseRepository: CaseJpaRepository,
     private val caseSourceRepository: CaseSourceJpaRepository,
     private val caseCommentRepository: CaseCommentJpaRepository,
+    private val suspicionDecisionRepository: SuspicionDecisionJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val partyService: PartyService,
     private val timelineService: TimelineService,
@@ -94,6 +95,8 @@ class CaseService(
             sources = caseSourceRepository.findByCaseIdOrderByAttachedAtAsc(case.id)
                 .map { CaseSourceView.from(it, objectMapper) },
             comments = caseCommentRepository.findByCaseIdOrderByCreatedAtAsc(case.id).map(CaseCommentView::from),
+            suspicionDecisions = suspicionDecisionRepository.findByCaseIdOrderByDecisionVersionAsc(case.id)
+                .map { SuspicionDecisionView.from(it, objectMapper) },
             timeline = timelineService.getByPartyId(case.partyId),
             availableActions = availableActions(case),
         )
@@ -139,6 +142,86 @@ class CaseService(
     }
 
     @Transactional
+    fun issueSuspicionDecision(caseId: String, command: IssueSuspicionDecisionCommand): SuspicionDecisionView {
+        val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
+        ensureVersion(case, command.expectedVersion)
+        if (case.status != CaseStatus.IN_ANALYSIS) {
+            throw InvalidCaseTransitionException(case.id, case.status)
+        }
+
+        val previousDecision = suspicionDecisionRepository.findTopByCaseIdOrderByDecisionVersionDesc(case.id)
+        val previousStatus = case.status
+        val now = Instant.now(clock)
+        val decision = suspicionDecisionRepository.save(
+            SuspicionDecisionEntity(
+                id = PrefixedUlid.next("sdn_"),
+                caseId = case.id,
+                partyId = case.partyId,
+                decision = command.decision,
+                decisionVersion = (previousDecision?.decisionVersion ?: 0) + 1,
+                reasonCodes = objectMapper.writeValueAsString(command.reasonCodes),
+                narrative = command.narrative.trim(),
+                policyVersion = command.policyVersion,
+                decidedByActorId = command.actor.id,
+                decidedByActorRole = command.actor.role.name,
+                decidedAt = now,
+                correlationId = command.correlationId,
+                previousDecisionId = previousDecision?.id,
+            ),
+        )
+
+        timelineRepository.save(
+            TimelineEntryEntity(
+                id = PrefixedUlid.next("tml_"),
+                partyId = case.partyId,
+                entryType = "SUSPICION_DECISION_ISSUED",
+                businessOccurredAt = now,
+                recordedAt = now,
+                actorType = command.actor.role.name,
+                actorId = command.actor.id,
+                summaryCode = "SUSPICION_DECISION_${command.decision.name}",
+                objectType = "SuspicionDecision",
+                objectId = decision.id,
+                objectVersion = decision.decisionVersion.toString(),
+                correlationId = command.correlationId,
+                causationId = case.id,
+                visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        outboxService.append(
+            eventType = "SuspicionDecisionIssued",
+            aggregateType = "SuspicionDecision",
+            aggregateId = decision.id,
+            payload = mapOf(
+                "decisionId" to decision.id,
+                "caseId" to case.id,
+                "partyId" to case.partyId,
+                "decision" to decision.decision.name,
+                "decisionVersion" to decision.decisionVersion,
+                "reasonCodes" to command.reasonCodes,
+                "policyVersion" to decision.policyVersion,
+                "previousDecisionId" to decision.previousDecisionId,
+                "correlationId" to command.correlationId,
+            ),
+        )
+
+        case.status = CaseStatus.DECIDED
+        case.version += 1
+        case.updatedAt = now
+        recordCaseStatusChanged(
+            case = case,
+            previousStatus = previousStatus,
+            actor = command.actor,
+            correlationId = command.correlationId,
+            now = now,
+            summaryCode = "CASE_DECIDED",
+        )
+
+        return SuspicionDecisionView.from(decision, objectMapper)
+    }
+
+    @Transactional
     fun assign(caseId: String, command: ChangeCaseStatusCommand): CaseCommandResultView {
         val case = caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }
         ensureVersion(case, command.expectedVersion)
@@ -151,7 +234,7 @@ class CaseService(
         case.version += 1
         case.updatedAt = now
 
-        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_ASSIGNED")
+        recordCaseStatusChanged(case, previousStatus, command.actor, command.correlationId, now, "CASE_ASSIGNED")
 
         return CaseCommandResultView.from(case, availableActions(case))
     }
@@ -168,7 +251,7 @@ class CaseService(
         case.version += 1
         case.updatedAt = now
 
-        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_IN_ANALYSIS")
+        recordCaseStatusChanged(case, previousStatus, command.actor, command.correlationId, now, "CASE_IN_ANALYSIS")
 
         return CaseCommandResultView.from(case, availableActions(case))
     }
@@ -188,7 +271,7 @@ class CaseService(
         case.version += 1
         case.updatedAt = now
 
-        recordCaseStatusChanged(case, previousStatus, command, now, "CASE_RETURNED_TO_QUEUE")
+        recordCaseStatusChanged(case, previousStatus, command.actor, command.correlationId, now, "CASE_RETURNED_TO_QUEUE")
 
         return CaseCommandResultView.from(case, availableActions(case))
     }
@@ -250,7 +333,8 @@ class CaseService(
     private fun recordCaseStatusChanged(
         case: CaseEntity,
         previousStatus: CaseStatus,
-        command: ChangeCaseStatusCommand,
+        actor: Actor,
+        correlationId: String,
         now: Instant,
         summaryCode: String,
     ) {
@@ -261,13 +345,13 @@ class CaseService(
                 entryType = "CASE_STATUS_CHANGED",
                 businessOccurredAt = now,
                 recordedAt = now,
-                actorType = command.actor.role.name,
-                actorId = command.actor.id,
+                actorType = actor.role.name,
+                actorId = actor.id,
                 summaryCode = summaryCode,
                 objectType = "Case",
                 objectId = case.id,
                 objectVersion = case.version.toString(),
-                correlationId = command.correlationId,
+                correlationId = correlationId,
                 causationId = null,
                 visibilityClassification = VisibilityClassification.CONFIDENTIAL,
             ),
@@ -286,7 +370,7 @@ class CaseService(
                 "assignedActorId" to case.assignedActorId,
                 "reasonCode" to case.reasonCode,
                 "version" to case.version,
-                "correlationId" to command.correlationId,
+                "correlationId" to correlationId,
             ),
         )
     }
@@ -348,6 +432,7 @@ data class CaseDetailView(
     val party: PartyView,
     val sources: List<CaseSourceView>,
     val comments: List<CaseCommentView>,
+    val suspicionDecisions: List<SuspicionDecisionView>,
     val timeline: TimelineView,
     val availableActions: List<CaseAction>,
 )
@@ -392,6 +477,16 @@ data class AddCaseCommentCommand(
     val body: String,
 )
 
+data class IssueSuspicionDecisionCommand(
+    val actor: Actor,
+    val correlationId: String,
+    val expectedVersion: Int,
+    val decision: SuspicionDecisionValue,
+    val reasonCodes: List<String>,
+    val narrative: String,
+    val policyVersion: String,
+)
+
 data class CaseCommentView(
     val commentId: String,
     val caseId: String,
@@ -429,6 +524,41 @@ data class CaseCommandResultView(
             version = entity.version,
             availableActions = availableActions,
         )
+    }
+}
+
+data class SuspicionDecisionView(
+    val decisionId: String,
+    val caseId: String,
+    val partyId: String,
+    val decision: SuspicionDecisionValue,
+    val decisionVersion: Int,
+    val reasonCodes: JsonNode,
+    val narrative: String,
+    val policyVersion: String,
+    val decidedByActorId: String,
+    val decidedByActorRole: String,
+    val decidedAt: Instant,
+    val correlationId: String,
+    val previousDecisionId: String?,
+) {
+    companion object {
+        fun from(entity: SuspicionDecisionEntity, objectMapper: ObjectMapper): SuspicionDecisionView =
+            SuspicionDecisionView(
+                decisionId = entity.id,
+                caseId = entity.caseId,
+                partyId = entity.partyId,
+                decision = entity.decision,
+                decisionVersion = entity.decisionVersion,
+                reasonCodes = objectMapper.readTree(entity.reasonCodes),
+                narrative = entity.narrative,
+                policyVersion = entity.policyVersion,
+                decidedByActorId = entity.decidedByActorId,
+                decidedByActorRole = entity.decidedByActorRole,
+                decidedAt = entity.decidedAt,
+                correlationId = entity.correlationId,
+                previousDecisionId = entity.previousDecisionId,
+            )
     }
 }
 

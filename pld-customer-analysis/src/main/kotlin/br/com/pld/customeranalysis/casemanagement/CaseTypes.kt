@@ -28,3 +28,10 @@ enum class CaseAction {
     START_ANALYSIS,
     RETURN_TO_QUEUE,
 }
+
+enum class SuspicionDecisionValue {
+    NO_SUSPICION,
+    KEEP_MONITORING,
+    COMMUNICATE_TO_COAF,
+    INCONCLUSIVE,
+}

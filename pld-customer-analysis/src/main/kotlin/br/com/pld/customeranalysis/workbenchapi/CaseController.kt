@@ -10,9 +10,13 @@ import br.com.pld.customeranalysis.casemanagement.CaseService
 import br.com.pld.customeranalysis.casemanagement.CaseVersionConflictException
 import br.com.pld.customeranalysis.casemanagement.ChangeCaseStatusCommand
 import br.com.pld.customeranalysis.casemanagement.InvalidCaseTransitionException
+import br.com.pld.customeranalysis.casemanagement.IssueSuspicionDecisionCommand
+import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionValue
+import br.com.pld.customeranalysis.casemanagement.SuspicionDecisionView
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -86,6 +90,32 @@ class CaseController(
             .body(comment)
     }
 
+    @PostMapping("/{caseId}/suspicion-decisions")
+    fun issueSuspicionDecision(
+        @PathVariable caseId: String,
+        @Valid @RequestBody request: IssueSuspicionDecisionRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): ResponseEntity<SuspicionDecisionView> {
+        val decision = caseService.issueSuspicionDecision(
+            caseId,
+            IssueSuspicionDecisionCommand(
+                actor = actorResolver.commandActor(actorId, actorRole),
+                correlationId = actorResolver.correlationId(correlationId),
+                expectedVersion = request.expectedVersion,
+                decision = request.decision,
+                reasonCodes = request.reasonCodes,
+                narrative = request.narrative,
+                policyVersion = request.policyVersion,
+            ),
+        )
+
+        return ResponseEntity
+            .created(URI.create("/v1/cases/$caseId/suspicion-decisions/${decision.decisionId}"))
+            .body(decision)
+    }
+
     private fun command(
         request: CaseTransitionRequest,
         actorId: String?,
@@ -112,4 +142,16 @@ data class CaseTransitionRequest(
 data class AddCaseCommentRequest(
     @field:NotBlank
     val body: String,
+)
+
+data class IssueSuspicionDecisionRequest(
+    @field:Min(1)
+    val expectedVersion: Int,
+    val decision: SuspicionDecisionValue,
+    @field:NotEmpty
+    val reasonCodes: List<@NotBlank String>,
+    @field:NotBlank
+    val narrative: String,
+    @field:NotBlank
+    val policyVersion: String,
 )

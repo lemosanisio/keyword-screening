@@ -43,7 +43,7 @@ class TransactionSignalCaseIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -243,6 +243,58 @@ class TransactionSignalCaseIntegrationTest {
             }
     }
 
+    @Test
+    fun `issues suspicion decision and closes case as decided`() {
+        val partyId = createParty()
+        transactionSignalConsumer.consume(transactionSignalDetectedEvent(partyId))
+        val caseId = cases().single().caseId
+        assignAndStartAnalysis(caseId)
+
+        mockMvc.post("/v1/cases/{caseId}/suspicion-decisions", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            header("X-Correlation-Id", "corr-suspicion-decision")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "expectedVersion": 3,
+                  "decision": "NO_SUSPICION",
+                  "reasonCodes": ["TRANSACTION_SIGNAL_REVIEWED"],
+                  "narrative": "Sinal analisado frente ao perfil e não há elementos suficientes de suspeição.",
+                  "policyVersion": "suspicion-policy-1"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.decisionId") { value(org.hamcrest.Matchers.startsWith("sdn_")) }
+            jsonPath("$.caseId") { value(caseId) }
+            jsonPath("$.decision") { value("NO_SUSPICION") }
+            jsonPath("$.decisionVersion") { value(1) }
+            jsonPath("$.decidedByActorId") { value("analyst-1") }
+        }
+
+        mockMvc.get("/v1/cases/{caseId}", caseId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.case.status") { value("DECIDED") }
+                jsonPath("$.case.version") { value(4) }
+                jsonPath("$.availableActions.length()") { value(0) }
+                jsonPath("$.suspicionDecisions.length()") { value(1) }
+                jsonPath("$.suspicionDecisions[0].decision") { value("NO_SUSPICION") }
+            }
+
+        assertThat(timelineEntryTypes(partyId)).contains("SUSPICION_DECISION_ISSUED")
+
+        assertThat(outboxEventTypes()).containsExactly(
+            "PartyCreated",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "CaseStatusChanged",
+            "SuspicionDecisionIssued",
+            "CaseStatusChanged",
+        )
+    }
+
     private fun createParty(): String = partyService.create(
         CreatePartyCommand(
             partyType = PartyType.PERSON,
@@ -252,6 +304,22 @@ class TransactionSignalCaseIntegrationTest {
             correlationId = "corr-party-create",
         ),
     ).partyId
+
+    private fun assignAndStartAnalysis(caseId: String) {
+        mockMvc.post("/v1/cases/{caseId}/assign", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":1}"""
+        }.andExpect { status { isOk() } }
+
+        mockMvc.post("/v1/cases/{caseId}/start-analysis", caseId) {
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"expectedVersion":2}"""
+        }.andExpect { status { isOk() } }
+    }
 
     private fun cases(): List<CaseRow> = jdbcTemplate.query(
         "select id, party_id, origin, status, source_count from pld_case order by created_at, id",
