@@ -75,6 +75,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [ADR-005 — convenções de integração](adr/ADR-005-integration-conventions.md)
 - [ADR-006 — estratégia de identidade e acesso](adr/ADR-006-identity-access-strategy.md)
 - [ADR-007 — plataforma de eventos](adr/ADR-007-eventing-platform.md)
+- [ADR-008 — escopo do Marco 1 e ordenação de filas](adr/ADR-008-marco-1-scope-and-queue-ordering.md)
 - [Decisões pendentes](open-decisions.md)
 - [Marco 0 — tasks](marco-0-tasks.md)
 - [Handoff para o agente local](agent-handoff.md)

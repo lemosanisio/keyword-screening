@@ -19,17 +19,17 @@ Decisões identificadas na revisão de requisitos (2026-07-20) que **não perten
 
 | # | Questão | Revisitar em | Observação |
 |---|---|---|---|
-| INT-2 | Corte exato da primeira fatia: requirements ("MVP recomendado") incluem caso/decisão; handoff Marco 1 é só fundação | Planejamento do Marco 1 | Proposta: seguir os Marcos (mais finos). Confirmar na virada. |
 | INT-3 | Compartilhar biblioteca de expressão entre os dois motores de regra? | Quando houver duplicação real e medida | Default: não compartilhar. Acoplamento prematuro > duplicação pequena. |
 | INT-4 | Calendário de dias úteis para prazo COAF (feriados nacionais/locais) | Marco 6 | Fonte de feriados e exceções de calendário a definir. |
 | INT-5 | Ferramenta de antivírus/validação de anexos | Marco 5 | Arquitetura exige validação antes de disponibilizar anexos; ferramenta aberta. |
-| INT-6 | SQS standard vs FIFO (ordenação por `partyId` via MessageGroupId) | Marco 0/1, junto com o design do outbox | NFR-05 menciona ordenação por chave onde necessário. Definir por fila, não globalmente. |
 
 ## Internas resolvidas
 
 | # | Decisão | Resolvida em | Resultado |
 |---|---|---|---|
 | INT-1 | Dono e ciclo de vida de `RiskProfile` | Marco 0 | `RiskProfile` é projeção versionada derivada de `Assessment`, publicada por `pld-customer-analysis` somente em mudança material consumível pelo motor transacional. O contrato `CustomerRiskProfileUpdated.v1` transporta apenas `riskLevel`, `segments`, `transactionFacts`, validade, política e referência `assessmentId`; evidências/narrativas ficam no serviço de origem. |
+| INT-2 | Corte exato da primeira fatia | Marco 1 | Seguir o handoff do Marco 1 (fundação vertical: Party, AnalysisCycle, timeline, outbox/inbox, segurança e APIs mínimas), não o MVP completo de caso/decisão. Ver ADR-008. |
+| INT-6 | SQS standard vs FIFO | Marco 1 | SQS Standard por padrão; FIFO somente por fila quando houver requisito local de ordenação por chave mensurado. Ver ADR-008. |
 
 ## Regras deste arquivo
 
