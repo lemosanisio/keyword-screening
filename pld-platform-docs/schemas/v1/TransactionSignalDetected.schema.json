@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionSignalDetected.v1",
+  "description": "Sinal transacional relevante publicado por pld-transaction-screening para análise do cliente/caso. Não é, sozinho, conclusão de suspeição. Contrato: shared/integration-contracts.md.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "TransactionSignalDetected" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "signalId",
+            "evaluationId",
+            "transactionId",
+            "signalType",
+            "severity",
+            "ruleMatches"
+          ],
+          "properties": {
+            "signalId": {
+              "type": "string",
+              "pattern": "^sig_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "evaluationId": {
+              "type": "string",
+              "pattern": "^evl_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "signalType": {
+              "type": "string",
+              "description": "Vocabulário aberto; valor conhecido: RULE_MATCH. Consumidor mapeia desconhecido para UNKNOWN."
+            },
+            "severity": {
+              "type": "string",
+              "description": "Vocabulário aberto; valores conhecidos: LOW, MEDIUM, HIGH, CRITICAL."
+            },
+            "ruleMatches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ruleCode", "ruleVersion"],
+                "properties": {
+                  "ruleCode": { "type": "string", "minLength": 1 },
+                  "ruleVersion": { "type": "integer", "minimum": 1 },
+                  "explanationCode": { "type": "string" }
+                }
+              }
+            },
+            "riskProfileVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Versão do perfil de risco local usado na avaliação."
+            },
+            "recommendedRoute": {
+              "enum": [
+                "AUTOMATIC",
+                "DERIVED_TO_ANALYST",
+                "MANDATORY_SECOND_APPROVAL",
+                "TECHNICAL_RETRY"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

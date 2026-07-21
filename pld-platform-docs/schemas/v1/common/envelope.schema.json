@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IntegrationEventEnvelope",
+  "description": "Envelope comum dos eventos de integração da plataforma PLD (v1). Normativo em campos obrigatórios e tipos; permissivo em campos extras, para preservar evolução aditiva na mesma versão (ver shared/integration-contracts.md e ADR-005).",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "publishedAt",
+    "producer",
+    "correlationId",
+    "actor",
+    "dataClassification",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID do evento (Crockford Base32, 26 chars)."
+    },
+    "eventType": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nome do evento sem sufixo de versão, ex.: TransactionSignalDetected."
+    },
+    "eventVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Instante de negócio em ISO-8601 UTC."
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "enum": ["pld-transaction-screening", "pld-customer-analysis", "external"]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Correlaciona a cadeia inteira de mensagens/requests."
+    },
+    "causationId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ID da mensagem/comando que causou diretamente este evento."
+    },
+    "actor": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "enum": ["SYSTEM", "ANALYST", "APPROVER", "RULE_ADMIN", "AUDITOR"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identificador corporativo estável; nunca nome ou e-mail."
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "description": "IDs conhecidos pelo produtor; cada campo é opcional individualmente.",
+      "properties": {
+        "partyId": {
+          "type": ["string", "null"],
+          "pattern": "^pty_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "accountId": {
+          "type": ["string", "null"],
+          "pattern": "^acc_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "analysisCycleId": {
+          "type": ["string", "null"],
+          "pattern": "^acy_[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "caseId": {
+          "type": ["string", "null"],
+          "pattern": "^cse_[0-9A-HJKMNP-TV-Z]{26}$"
+        }
+      }
+    },
+    "dataClassification": {
+      "enum": ["INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Corpo específico do evento; schema do evento restringe este campo."
+    }
+  }
+}
