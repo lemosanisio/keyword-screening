@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SuspicionDecisionIssued.v1",
+  "description": "Decisão explícita de suspeição, publicada por pld-customer-analysis. Narrativa sensível NÃO viaja no evento (minimização, NFR-02); permanece no serviço de origem.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "SuspicionDecisionIssued" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "decisionId",
+            "decisionVersion",
+            "decision",
+            "route",
+            "policyVersion",
+            "analysisCycleId"
+          ],
+          "properties": {
+            "decisionId": {
+              "type": "string",
+              "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "decisionVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "decision": {
+              "enum": [
+                "NO_SUSPICION",
+                "KEEP_MONITORING",
+                "COMMUNICATE_TO_COAF",
+                "INCONCLUSIVE"
+              ],
+              "description": "Vocabulário fechado do glossário."
+            },
+            "route": {
+              "enum": [
+                "AUTOMATIC",
+                "DERIVED_TO_ANALYST",
+                "MANDATORY_SECOND_APPROVAL",
+                "TECHNICAL_RETRY"
+              ]
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "analysisCycleId": {
+              "type": "string",
+              "pattern": "^acy_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "caseId": {
+              "type": "string",
+              "pattern": "^cse_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "supersedesDecisionId": {
+              "type": "string",
+              "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

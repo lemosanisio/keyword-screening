@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AccountDecisionIssued.v1",
+  "description": "Decisão explícita de relacionamento, publicada por pld-customer-analysis. NÃO afirma que a ação foi aplicada — o resultado retorna por AccountStatusChanged ou confirmação do executor.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "AccountDecisionIssued" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "decisionId",
+            "decisionVersion",
+            "context",
+            "decision",
+            "route",
+            "policyVersion",
+            "analysisCycleId"
+          ],
+          "properties": {
+            "decisionId": {
+              "type": "string",
+              "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "decisionVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "context": {
+              "enum": ["ONBOARDING", "ONGOING"]
+            },
+            "decision": {
+              "enum": [
+                "APPROVE",
+                "APPROVE_WITH_CONDITIONS",
+                "REQUEST_INFORMATION",
+                "REJECT",
+                "MAINTAIN",
+                "RESTRICT",
+                "SUSPEND",
+                "TERMINATE_RELATIONSHIP"
+              ],
+              "description": "União dos valores de onboarding e ongoing do glossário; o contexto restringe o subconjunto válido."
+            },
+            "route": {
+              "enum": [
+                "AUTOMATIC",
+                "DERIVED_TO_ANALYST",
+                "MANDATORY_SECOND_APPROVAL",
+                "TECHNICAL_RETRY"
+              ]
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "analysisCycleId": {
+              "type": "string",
+              "pattern": "^acy_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "caseId": {
+              "type": "string",
+              "pattern": "^cse_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "requestedEffect": {
+              "type": "string",
+              "description": "Efeito solicitado ao sistema de contas; vocabulário do executor, não do produtor."
+            },
+            "supersedesDecisionId": {
+              "type": "string",
+              "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

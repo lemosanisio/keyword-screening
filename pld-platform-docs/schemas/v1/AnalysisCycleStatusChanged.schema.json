@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnalysisCycleStatusChanged.v1",
+  "description": "Transição relevante de um AnalysisCycle, publicada por pld-customer-analysis. Estados seguem a máquina de estados do glossário (vocabulário fechado).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "AnalysisCycleStatusChanged" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "analysisCycleId",
+            "cycleType",
+            "previousStatus",
+            "newStatus",
+            "reasonCode",
+            "policyVersion"
+          ],
+          "properties": {
+            "analysisCycleId": {
+              "type": "string",
+              "pattern": "^acy_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "cycleType": {
+              "enum": [
+                "ONBOARDING",
+                "PERIODIC_REVIEW",
+                "EVENT_DRIVEN_REVIEW",
+                "TRANSACTION_ALERT",
+                "REGULATORY_REQUEST",
+                "MANUAL_REVIEW"
+              ]
+            },
+            "previousStatus": {
+              "enum": [
+                "CREATED",
+                "COLLECTING_EVIDENCE",
+                "TECHNICAL_PENDING",
+                "READY_FOR_EVALUATION",
+                "AUTO_CLEARED",
+                "DERIVED",
+                "RISK_DETECTED",
+                "UNDER_REVIEW",
+                "AWAITING_APPROVAL",
+                "DECIDED",
+                "REPORTED",
+                "CLOSED",
+                null
+              ],
+              "description": "null na criação do ciclo."
+            },
+            "newStatus": {
+              "enum": [
+                "CREATED",
+                "COLLECTING_EVIDENCE",
+                "TECHNICAL_PENDING",
+                "READY_FOR_EVALUATION",
+                "AUTO_CLEARED",
+                "DERIVED",
+                "RISK_DETECTED",
+                "UNDER_REVIEW",
+                "AWAITING_APPROVAL",
+                "DECIDED",
+                "REPORTED",
+                "CLOSED"
+              ]
+            },
+            "reasonCode": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Toda transição possui reason code (CA-FR-004)."
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Versão da política efetiva fixada no ciclo."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

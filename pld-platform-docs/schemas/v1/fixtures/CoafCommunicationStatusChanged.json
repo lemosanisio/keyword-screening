@@ -1,0 +1,27 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W2A",
+  "eventType": "CoafCommunicationStatusChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-21T10:05:00Z",
+  "publishedAt": "2026-07-21T10:05:01Z",
+  "producer": "pld-customer-analysis",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0W1A",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "coaf-submission"
+  },
+  "subject": {
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "accountId": null,
+    "analysisCycleId": "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B",
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B"
+  },
+  "dataClassification": "RESTRICTED",
+  "payload": {
+    "communicationId": "coaf_01J6ZK7Q3W8K0M2N4P6R8T0W2B",
+    "previousStatus": "READY_TO_SEND",
+    "newStatus": "SENT",
+    "attemptId": "att_01J6ZK7Q3W8K0M2N4P6R8T0W2C"
+  }
+}

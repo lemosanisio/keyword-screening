@@ -2,6 +2,8 @@
 
 Status: proposta de contrato lógico `v1`. A serialização final pode ser JSON, Avro ou Protobuf segundo a plataforma do time, desde que preserve a semântica.
 
+> **Serialização normativa:** JSON + JSON Schema (ADR-005). Os schemas versionados e fixtures douradas vivem em [`../schemas/v1/`](../schemas/v1/) e são a fonte executável deste contrato — este documento descreve a semântica; o catálogo é a forma. Não manter cópias divergentes de payload entre os dois.
+
 ## Princípios
 
 - Eventos descrevem fatos passados; comandos solicitam uma ação.

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuleConfigurationActivated.v1",
+  "description": "Nova configuração de regras ativada em pld-transaction-screening. Para auditoria/monitoramento — não distribui conteúdo das regras.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "RuleConfigurationActivated" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": ["rulesetVersion"],
+          "properties": {
+            "rulesetVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "effectiveFrom": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "ruleCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "changeSummary": {
+              "type": "string",
+              "description": "Resumo da mudança para auditoria; sem conteúdo de regra."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

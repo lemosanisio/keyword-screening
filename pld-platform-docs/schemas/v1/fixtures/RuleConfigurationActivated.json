@@ -1,0 +1,26 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V6A",
+  "eventType": "RuleConfigurationActivated",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T10:00:00Z",
+  "publishedAt": "2026-07-20T10:00:01Z",
+  "producer": "pld-transaction-screening",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V6B",
+  "actor": {
+    "type": "RULE_ADMIN",
+    "id": "usr-4821"
+  },
+  "subject": {
+    "partyId": null,
+    "accountId": null,
+    "analysisCycleId": null,
+    "caseId": null
+  },
+  "dataClassification": "INTERNAL",
+  "payload": {
+    "rulesetVersion": "ruleset-42",
+    "effectiveFrom": "2026-07-20T10:00:00Z",
+    "ruleCount": 37,
+    "changeSummary": "Ativação da versão ruleset-42 com ajuste de limiares PIX"
+  }
+}

@@ -125,6 +125,8 @@ tasks.withType<Test> {
 
 tasks.test {
     exclude("**/integration/**", "**/*IntegrationTest*")
+    // Catálogo de contratos vive fora do projeto: mudança em schema/fixture deve re-rodar os testes
+    inputs.dir(file("../pld-platform-docs/schemas"))
 }
 
 tasks.register<Test>("integrationTest") {

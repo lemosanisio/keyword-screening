@@ -10,9 +10,9 @@ Local: `pld-platform-docs/schemas/v1/`. JSON Schema draft 2020-12 (ADR-005). Cad
 
 - [x] M0.1.1 `common/envelope.schema.json` + tipos compartilhados (`actor`, `subject`, `dataClassification`; `money`/`factValue` entram quando um evento precisar — YAGNI)
 - [ ] M0.1.2 Eventos de entrada (produtor: sistemas mestres): `CustomerOnboardingStarted`, `CustomerDataChanged`, `PartyRelationshipChanged`, `AccountStatusChanged`, `TransactionOccurred`
-- [ ] M0.1.3 Eventos de `pld-customer-analysis`: `CustomerRiskProfileUpdated`, `AnalysisCycleStatusChanged`, `CaseStatusChanged`, `AccountDecisionIssued`, `SuspicionDecisionIssued`, `CoafCommunicationStatusChanged`
-- [ ] M0.1.4 Eventos de `pld-transaction-screening`: `TransactionEvaluationCompleted`, `TransactionSignalDetected`, `ManualReviewRequested`, `TransactionDecisionExecutionCompleted`, `RuleConfigurationActivated`
-- [ ] M0.1.5 Fixture dourada por evento em `fixtures/` — sem PII, `dataClassification` preenchida, IDs no padrão ADR-005
+- [ ] M0.1.3 Eventos de `pld-customer-analysis`: `CustomerRiskProfileUpdated` (bloqueado por INT-1), `AnalysisCycleStatusChanged` ✔, `CaseStatusChanged` ✔, `AccountDecisionIssued` ✔, `SuspicionDecisionIssued` ✔, `CoafCommunicationStatusChanged` ✔
+- [x] M0.1.4 Eventos de `pld-transaction-screening`: `TransactionEvaluationCompleted`, `TransactionSignalDetected`, `ManualReviewRequested`, `TransactionDecisionExecutionCompleted`, `RuleConfigurationActivated`
+- [ ] M0.1.5 Fixture dourada por evento em `fixtures/` (10/16 — faltam os 5 de entrada e `CustomerRiskProfileUpdated`) — sem PII, `dataClassification` preenchida, IDs no padrão ADR-005
 
 ## M0.2 — Convenções normativas restantes
 

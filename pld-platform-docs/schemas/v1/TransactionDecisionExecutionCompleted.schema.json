@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionDecisionExecutionCompleted.v1",
+  "description": "Resultado de uma ação técnica decidida pelo motor transacional (ex.: retenção/bloqueio), publicado por pld-transaction-screening. Distingue pedido, aplicação, falha e reversão.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "TransactionDecisionExecutionCompleted" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "commandId",
+            "transactionId",
+            "actionType",
+            "status"
+          ],
+          "properties": {
+            "commandId": {
+              "type": "string",
+              "pattern": "^cmd_[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "Chave de idempotência imutável do comando."
+            },
+            "evaluationId": {
+              "type": "string",
+              "pattern": "^evl_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "actionType": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tipo da ação técnica; vocabulário aberto."
+            },
+            "status": {
+              "enum": ["REQUESTED", "APPLIED", "FAILED", "REVERSED"]
+            },
+            "failureReason": {
+              "type": "string",
+              "description": "Motivo sanitizado quando status = FAILED."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

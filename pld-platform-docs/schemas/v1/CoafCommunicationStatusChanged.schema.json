@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CoafCommunicationStatusChanged.v1",
+  "description": "Transição de uma CoafCommunication, publicada por pld-customer-analysis. Estados seguem o fluxo do glossário (vocabulário fechado). Referência de recibo somente quando permitido — nunca conteúdo da comunicação.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "CoafCommunicationStatusChanged" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "communicationId",
+            "previousStatus",
+            "newStatus"
+          ],
+          "properties": {
+            "communicationId": {
+              "type": "string",
+              "pattern": "^coaf_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "previousStatus": {
+              "enum": [
+                "DRAFT",
+                "UNDER_REVIEW",
+                "APPROVED",
+                "READY_TO_SEND",
+                "SENT",
+                "ACKNOWLEDGED",
+                "REJECTED_FOR_CORRECTION",
+                "RECTIFICATION_REQUIRED",
+                "RECTIFIED",
+                "CANCELLED",
+                "SUBMISSION_FAILED",
+                null
+              ],
+              "description": "null na criação da comunicação."
+            },
+            "newStatus": {
+              "enum": [
+                "DRAFT",
+                "UNDER_REVIEW",
+                "APPROVED",
+                "READY_TO_SEND",
+                "SENT",
+                "ACKNOWLEDGED",
+                "REJECTED_FOR_CORRECTION",
+                "RECTIFICATION_REQUIRED",
+                "RECTIFIED",
+                "CANCELLED",
+                "SUBMISSION_FAILED"
+              ]
+            },
+            "attemptId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Identificador da tentativa de envio, quando aplicável."
+            },
+            "receiptRef": {
+              "type": "string",
+              "description": "Referência opaca do recibo, somente quando permitido."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

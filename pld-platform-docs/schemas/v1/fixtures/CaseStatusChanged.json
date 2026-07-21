@@ -1,0 +1,28 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V8A",
+  "eventType": "CaseStatusChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T15:32:05Z",
+  "publishedAt": "2026-07-20T15:32:06Z",
+  "producer": "pld-customer-analysis",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V3A",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "case-manager"
+  },
+  "subject": {
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E",
+    "analysisCycleId": "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B",
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B",
+    "origin": "TRANSACTION",
+    "previousStatus": null,
+    "newStatus": "OPEN",
+    "reasonCodes": ["MANUAL_REVIEW_REQUESTED"]
+  }
+}

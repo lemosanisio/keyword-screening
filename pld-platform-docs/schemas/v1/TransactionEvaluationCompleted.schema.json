@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionEvaluationCompleted.v1",
+  "description": "Execução de avaliação transacional concluída, publicada por pld-transaction-screening. Transporta referência da transação, versões e explicação — nunca o snapshot completo (NFR-05).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "TransactionEvaluationCompleted" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "evaluationId",
+            "transactionId",
+            "evaluatedAt",
+            "rulesetVersion",
+            "rulesExecuted",
+            "executionStatus"
+          ],
+          "properties": {
+            "evaluationId": {
+              "type": "string",
+              "pattern": "^evl_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "inputEventVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Versão do evento de entrada (TransactionOccurred) que originou a avaliação."
+            },
+            "evaluatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "transactionSnapshotRef": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Referência opaca ao snapshot da transação; o snapshot não viaja no broker."
+            },
+            "rulesetVersion": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Versão do catálogo/configuração de regras aplicada."
+            },
+            "riskProfileVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Versão do perfil de risco local usado."
+            },
+            "rulesExecuted": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ruleCode", "ruleVersion"],
+                "properties": {
+                  "ruleCode": { "type": "string", "minLength": 1 },
+                  "ruleVersion": { "type": "integer", "minimum": 1 }
+                }
+              }
+            },
+            "rulesTriggered": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ruleCode", "ruleVersion"],
+                "properties": {
+                  "ruleCode": { "type": "string", "minLength": 1 },
+                  "ruleVersion": { "type": "integer", "minimum": 1 },
+                  "explanationCode": { "type": "string" }
+                }
+              }
+            },
+            "factsConsidered": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["code", "quality"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1 },
+                  "quality": {
+                    "enum": ["PRESENT", "UNKNOWN", "STALE", "ERROR"],
+                    "description": "Vocabulário fechado de qualidade de fato (glossário)."
+                  }
+                }
+              }
+            },
+            "missingFacts": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "technicalOutcome": {
+              "type": "string",
+              "description": "Decisão técnica da avaliação; vocabulário aberto."
+            },
+            "explanation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1 },
+                  "detail": { "type": "string" }
+                }
+              }
+            },
+            "latencyMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "executionStatus": {
+              "enum": ["COMPLETED", "FAILED"],
+              "description": "Status da execução, sem dados secretos."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

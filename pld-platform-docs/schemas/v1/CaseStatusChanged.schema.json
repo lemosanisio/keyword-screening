@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CaseStatusChanged.v1",
+  "description": "Criação, atribuição ou transição de um Case, publicada por pld-customer-analysis.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "CaseStatusChanged" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "caseId",
+            "origin",
+            "previousStatus",
+            "newStatus",
+            "reasonCodes"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "pattern": "^cse_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "origin": {
+              "enum": [
+                "ONBOARDING",
+                "REVALIDATION",
+                "TRANSACTION",
+                "REGULATORY",
+                "MANUAL"
+              ],
+              "description": "Origens de caso conforme CA-FR-014."
+            },
+            "previousStatus": {
+              "enum": [
+                "OPEN",
+                "ASSIGNED",
+                "IN_ANALYSIS",
+                "WAITING_INFORMATION",
+                "WAITING_TECHNICAL",
+                "PENDING_APPROVAL",
+                "DECIDED",
+                "CLOSED",
+                "CANCELLED_AS_DUPLICATE",
+                null
+              ],
+              "description": "null na criação do caso."
+            },
+            "newStatus": {
+              "enum": [
+                "OPEN",
+                "ASSIGNED",
+                "IN_ANALYSIS",
+                "WAITING_INFORMATION",
+                "WAITING_TECHNICAL",
+                "PENDING_APPROVAL",
+                "DECIDED",
+                "CLOSED",
+                "CANCELLED_AS_DUPLICATE"
+              ]
+            },
+            "assigneeId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Responsável opcional; identificador corporativo estável."
+            },
+            "reasonCodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Vocabulário aberto de reason codes da transição."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

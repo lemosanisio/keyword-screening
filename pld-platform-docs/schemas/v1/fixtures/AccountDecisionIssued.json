@@ -1,0 +1,31 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V9A",
+  "eventType": "AccountDecisionIssued",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-21T09:15:00Z",
+  "publishedAt": "2026-07-21T09:15:01Z",
+  "producer": "pld-customer-analysis",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V8A",
+  "actor": {
+    "type": "ANALYST",
+    "id": "usr-1177"
+  },
+  "subject": {
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E",
+    "analysisCycleId": "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B",
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "decisionId": "dec_01J6ZK7Q3W8K0M2N4P6R8T0V9B",
+    "decisionVersion": 1,
+    "context": "ONGOING",
+    "decision": "MAINTAIN",
+    "route": "DERIVED_TO_ANALYST",
+    "policyVersion": "customer-risk-12",
+    "analysisCycleId": "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B",
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B"
+  }
+}
