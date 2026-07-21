@@ -16,8 +16,8 @@ Local: `pld-platform-docs/schemas/v1/`. JSON Schema draft 2020-12 (ADR-005). Cad
 
 ## M0.2 — Convenções normativas restantes
 
-- [ ] M0.2.1 Propagação de correlação ponta a ponta: HTTP (`Idempotency-Key`, header de correlação) → envelope (`correlationId`, `causationId`) → logs estruturados. Registrar em `shared/integration-contracts.md`
-- [ ] M0.2.2 Confirmar UTC/ISO-8601 e moeda (já nos contratos) — marcar como congelado v1
+- [x] M0.2.1 Propagação de correlação ponta a ponta: HTTP (`Idempotency-Key`, header de correlação) → envelope (`correlationId`, `causationId`) → logs estruturados. Registrado em `shared/integration-contracts.md`
+- [x] M0.2.2 Confirmar UTC/ISO-8601 e moeda — congelado v1 em `shared/integration-contracts.md`
 
 ## M0.3 — Testes de contrato
 
@@ -29,7 +29,7 @@ Primeiro código do Marco 0. TDD: teste primeiro, sempre.
 
 ## M0.4 — Mapa de compatibilidade das APIs atuais
 
-- [ ] M0.4.1 Inventário dos endpoints atuais de `pld-transaction-screening` (fonte: `src/main/resources/static/openapi/openapi.yaml`): o que permanece compatível durante a migração, o que vira legado (workflow de `Alert`), janela de convivência. Saída: `pld-transaction-screening/docs/pld-expansion/api-compatibility-map.md`
+- [x] M0.4.1 Inventário dos endpoints atuais de `pld-transaction-screening` (fonte: `src/main/resources/static/openapi/openapi.yaml`): o que permanece compatível durante a migração, o que vira legado (workflow de `Alert`), janela de convivência. Saída: `pld-transaction-screening/docs/pld-expansion/api-compatibility-map.md`
 
 ## Definition of Done do Marco 0
 

@@ -44,6 +44,22 @@ Status: proposta de contrato lógico `v1`. A serialização final pode ser JSON,
 
 Campos de `subject` são opcionais individualmente, mas o produtor deve incluir todos os IDs que conhece. O `actor.id` de usuário deve ser o identificador corporativo estável, não nome ou e-mail.
 
+## Correlação, causação e idempotência HTTP
+
+Chamadas síncronas e eventos usam a mesma cadeia de rastreabilidade:
+
+| Entrada | Regra |
+|---|---|
+| `X-Correlation-Id` ausente | o primeiro backend gera um ULID e propaga como `correlationId` |
+| `X-Correlation-Id` presente | validar formato mínimo (não vazio) e propagar sem trocar |
+| comando HTTP aceito | se produzir evento, `causationId` recebe o ID do comando/evento/request imediatamente causador |
+| `Idempotency-Key` presente | obrigatório em comandos com efeito externo ou criação não natural-idempotente; persistir junto ao comando/processamento |
+| `Idempotency-Key` ausente em comando idempotente obrigatório | responder erro de validação antes de executar side effects |
+
+Logs, traces e métricas carregam `correlationId`, `causationId` quando houver, `eventId`, `evaluationId`, `analysisCycleId` e `caseId` como campos estruturados, sem PII. O frontend pode repassar `X-Correlation-Id`; se não repassar, o BFF gera. Replays mantêm o `correlationId` original e usam `causationId` novo que aponta para a operação de replay.
+
+UTC/ISO-8601 é obrigatório em todos os horários de negócio e de publicação. Valores monetários trafegam como string decimal + moeda ISO 4217 (`amount.value`, `amount.currency`).
+
 ## Eventos de entrada da plataforma
 
 Estes eventos podem ser produzidos por sistemas externos; não pertencem aos dois backends PLD.
