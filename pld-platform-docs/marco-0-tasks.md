@@ -8,7 +8,7 @@ Item já concluído do handoff: documentos adicionados ao workspace ✔ (2026-07
 
 Local: `pld-platform-docs/schemas/v1/`. JSON Schema draft 2020-12 (ADR-005). Cada evento referencia o envelope comum.
 
-- [ ] M0.1.1 `common/envelope.schema.json` + tipos compartilhados (`actor`, `subject`, `money`, `factValue`, `dataClassification`)
+- [x] M0.1.1 `common/envelope.schema.json` + tipos compartilhados (`actor`, `subject`, `dataClassification`; `money`/`factValue` entram quando um evento precisar — YAGNI)
 - [ ] M0.1.2 Eventos de entrada (produtor: sistemas mestres): `CustomerOnboardingStarted`, `CustomerDataChanged`, `PartyRelationshipChanged`, `AccountStatusChanged`, `TransactionOccurred`
 - [ ] M0.1.3 Eventos de `pld-customer-analysis`: `CustomerRiskProfileUpdated`, `AnalysisCycleStatusChanged`, `CaseStatusChanged`, `AccountDecisionIssued`, `SuspicionDecisionIssued`, `CoafCommunicationStatusChanged`
 - [ ] M0.1.4 Eventos de `pld-transaction-screening`: `TransactionEvaluationCompleted`, `TransactionSignalDetected`, `ManualReviewRequested`, `TransactionDecisionExecutionCompleted`, `RuleConfigurationActivated`
@@ -23,8 +23,8 @@ Local: `pld-platform-docs/schemas/v1/`. JSON Schema draft 2020-12 (ADR-005). Cad
 
 Primeiro código do Marco 0. TDD: teste primeiro, sempre.
 
-- [ ] M0.3.1 Harness fixture↔schema rodando em `pld-transaction-screening` (único runner de testes hoje): falha se qualquer fixture violar seu schema
-- [ ] M0.3.2 Tolerância a campo desconhecido: fixture com campo extra não falha a validação de consumidor (regra já prevista nos contratos)
+- [x] M0.3.1 Harness fixture↔schema rodando em `pld-transaction-screening` (scan parametrizado de `fixtures/`): falha se qualquer fixture violar seu schema
+- [x] M0.3.2 Tolerância a campo desconhecido: fixture com campo extra não falha a validação de consumidor (regra já prevista nos contratos)
 - [ ] M0.3.3 (Quando houver produtor real, em Marcos seguintes) evento emitido valida contra schema antes de publicar
 
 ## M0.4 — Mapa de compatibilidade das APIs atuais

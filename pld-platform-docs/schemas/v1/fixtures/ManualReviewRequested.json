@@ -1,0 +1,34 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V3A",
+  "eventType": "ManualReviewRequested",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T15:30:02Z",
+  "publishedAt": "2026-07-20T15:30:03Z",
+  "producer": "pld-transaction-screening",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2A",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "rule-engine"
+  },
+  "subject": {
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E",
+    "analysisCycleId": null,
+    "caseId": null
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "reviewRequestId": "rrq_01J6ZK7Q3W8K0M2N4P6R8T0V3F",
+    "evaluationId": "evl_01J6ZK7Q3W8K0M2N4P6R8T0V2G",
+    "transactionId": "txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H",
+    "signalIds": [
+      "sig_01J6ZK7Q3W8K0M2N4P6R8T0V2F"
+    ],
+    "reasonCodes": [
+      "POLICY_REQUIRES_REVIEW",
+      "HIGH_IMPACT_ACTION"
+    ],
+    "recommendedRoute": "MANDATORY_SECOND_APPROVAL"
+  }
+}

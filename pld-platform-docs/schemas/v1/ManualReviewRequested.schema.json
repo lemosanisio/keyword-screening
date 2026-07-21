@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ManualReviewRequested.v1",
+  "description": "Pedido de revisão humana publicado por pld-transaction-screening quando regra/política exige caso. pld-customer-analysis deduplica por (sourceSystem, sourceRequestId, groupingPolicyVersion) e abre/atualiza o caso. Contrato: shared/integration-contracts.md.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "ManualReviewRequested" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "reviewRequestId",
+            "evaluationId",
+            "transactionId",
+            "reasonCodes"
+          ],
+          "properties": {
+            "reviewRequestId": {
+              "type": "string",
+              "pattern": "^rrq_[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "sourceRequestId da chave de idempotência de abertura de caso."
+            },
+            "evaluationId": {
+              "type": "string",
+              "pattern": "^evl_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "signalIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^sig_[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "description": "Sinais que motivaram o pedido; a explicação detalhada vive neles."
+            },
+            "reasonCodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  "INSUFFICIENT_EVIDENCE",
+                  "CONFLICTING_EVIDENCE",
+                  "LOW_IDENTITY_CONFIDENCE",
+                  "SOURCE_UNAVAILABLE",
+                  "STALE_EVIDENCE",
+                  "POLICY_REQUIRES_REVIEW",
+                  "HIGH_IMPACT_ACTION",
+                  "UNCLASSIFIED_SITUATION"
+                ]
+              },
+              "description": "Vocabulário fechado de motivos de deriva (glossário normativo)."
+            },
+            "recommendedRoute": {
+              "enum": [
+                "AUTOMATIC",
+                "DERIVED_TO_ANALYST",
+                "MANDATORY_SECOND_APPROVAL",
+                "TECHNICAL_RETRY"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

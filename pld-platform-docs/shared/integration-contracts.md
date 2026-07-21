@@ -128,11 +128,32 @@ Payload essencial:
 }
 ```
 
+### `ManualReviewRequested.v1`
+
+Publicado quando regra/política exige trabalho humano. `pld-customer-analysis` é dono da deduplicação — chave `(sourceSystem, sourceRequestId, groupingPolicyVersion)`, onde `sourceRequestId` = `reviewRequestId` — e do caso.
+
+Payload essencial:
+
+```json
+{
+  "reviewRequestId": "rrq_...",
+  "evaluationId": "evl_...",
+  "transactionId": "txn_...",
+  "signalIds": ["sig_..."],
+  "reasonCodes": ["POLICY_REQUIRES_REVIEW", "HIGH_IMPACT_ACTION"],
+  "recommendedRoute": "MANDATORY_SECOND_APPROVAL"
+}
+```
+
+- `reasonCodes` usa o vocabulário fechado de motivos de deriva do glossário.
+- Sem `severity`/`priority`: prioridade é calculada pelo consumidor conforme política; a explicação detalhada vive nos sinais/avaliação referenciados.
+- `recommendedRoute` distingue revisão de analista (`DERIVED_TO_ANALYST`) de segunda aprovação (`MANDATORY_SECOND_APPROVAL`).
+
 ### Outros eventos
 
 | Evento | Quando ocorre | Observação |
 |---|---|---|
-| `ManualReviewRequested.v1` | regra/política requer caso humano | customer analysis é dono da deduplicação e do caso |
+| `ManualReviewRequested.v1` | regra/política requer caso humano | ver seção própria acima |
 | `TransactionDecisionExecutionCompleted.v1` | uma ação técnica foi tentada/aplicada | distingue `REQUESTED`, `APPLIED`, `FAILED`, `REVERSED` |
 | `RuleConfigurationActivated.v1` | nova configuração entra em vigor | útil para auditoria/monitoramento, sem distribuir lógica |
 
