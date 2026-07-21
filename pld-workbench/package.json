@@ -9,6 +9,9 @@
     "build:css": "tailwindcss -i ./src/styles/globals.css -o ./dist/globals.css",
     "seed:transaction-case": "bun ./scripts/seed-transaction-case.ts",
     "test": "bun test",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:real": "PLD_TRANSACTION_E2E=true playwright test e2e/transaction-signal.e2e.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -23,6 +26,7 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/bun": "^1.1.13",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

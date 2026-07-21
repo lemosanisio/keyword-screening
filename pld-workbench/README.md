@@ -22,3 +22,19 @@ PLD_API_BASE_URL=http://localhost:8082 PLD_SCENARIO=SOURCE_UNAVAILABLE mise exec
 ```
 
 Cenários disponíveis: `CLEAR`, `SOURCE_UNAVAILABLE` e `RISK_CONTEXT`.
+
+## Testes E2E
+
+Com `pld-customer-analysis` disponível em `http://localhost:8082`:
+
+```bash
+mise exec -- bun run test:e2e
+```
+
+Esse comando cobre prontidão decisória, retry, conclusão, aprovação sensível e layout mobile. O cenário do motor real é separado porque exige `pld-transaction-screening` em `http://localhost:8081`, SQS/LocalStack habilitado nos dois serviços e uma configuração `KEYWORD_SCREENING` ativa:
+
+```bash
+mise exec -- bun run test:e2e:real
+```
+
+O Playwright usa o Chromium do sistema em `/usr/bin/chromium` e inicia o Workbench automaticamente quando a porta `5173` estiver livre.

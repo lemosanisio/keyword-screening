@@ -101,6 +101,7 @@ function DecisionForm({
   const [policyVersion, setPolicyVersion] = React.useState(defaultPolicy);
 
   const sensitive = decision === "TERMINATE_RELATIONSHIP" || decision === "SUSPEND" || decision === "RESTRICT" || decision === "COMMUNICATE_TO_COAF";
+  const fieldName = title.toLowerCase();
 
   return (
     <div className="space-y-3">
@@ -109,13 +110,13 @@ function DecisionForm({
         {sensitive && <p className="mt-1 text-xs text-amber-700">Ação sensível: deve gerar pendência para segundo aprovador.</p>}
       </div>
       <div className="grid gap-2 md:grid-cols-2">
-        <Select value={decision} onChange={(event) => setDecision(event.target.value)}>
+        <Select aria-label={`Decisão de ${fieldName}`} value={decision} onChange={(event) => setDecision(event.target.value)}>
           {options.map((option) => <option key={option} value={option}>{option}</option>)}
         </Select>
-        <Input value={policyVersion} onChange={(event) => setPolicyVersion(event.target.value)} placeholder="policyVersion" />
+        <Input aria-label={`Versão da política de ${fieldName}`} value={policyVersion} onChange={(event) => setPolicyVersion(event.target.value)} placeholder="policyVersion" />
       </div>
-      <Input value={reasonCodes} onChange={(event) => setReasonCodes(event.target.value)} placeholder="Reason codes separados por vírgula" />
-      <Textarea value={narrative} onChange={(event) => setNarrative(event.target.value)} placeholder="Narrativa da decisão" />
+      <Input aria-label={`Reason codes de ${fieldName}`} value={reasonCodes} onChange={(event) => setReasonCodes(event.target.value)} placeholder="Reason codes separados por vírgula" />
+      <Textarea aria-label={`Narrativa da decisão de ${fieldName}`} value={narrative} onChange={(event) => setNarrative(event.target.value)} placeholder="Narrativa da decisão" />
       <Button
         size="sm"
         disabled={busy || disabled || narrative.trim().length === 0}

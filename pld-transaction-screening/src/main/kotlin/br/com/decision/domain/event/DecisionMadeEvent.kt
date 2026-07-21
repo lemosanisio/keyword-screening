@@ -35,5 +35,8 @@ data class DecisionMadeEvent(
     val matchedExpressions: List<ExpressionEvaluation>,
     val configurationVersion: ConfigurationVersion,
     val executionTimeMs: Long,
-    val explanation: DecisionExplanation
+    val explanation: DecisionExplanation,
+    val evaluationId: String? = null,
+    val correlationId: String? = null,
+    val causationId: String? = null,
 ) : DomainEvent

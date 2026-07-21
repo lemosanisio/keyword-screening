@@ -18,6 +18,8 @@ bin/
 node_modules/
 pld-workbench/dist/
 pld-workbench/.bun/
+pld-workbench/playwright-report/
+pld-workbench/test-results/
 
 # OS
 .DS_Store

@@ -30,18 +30,18 @@ export function QueuePage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-medium">Cenário demonstrável</div>
           <div className="text-xs text-muted-foreground">Cria Party, ciclo de análise, sinal transacional e caso aberto.</div>
         </div>
-        <div className="flex items-center gap-2">
-          <Select className="w-56" value={scenario} onChange={(event) => setScenario(event.target.value as EvidenceScenario)}>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Select aria-label="Cenário demonstrável" className="w-full sm:w-56" value={scenario} onChange={(event) => setScenario(event.target.value as EvidenceScenario)}>
             <option value="CLEAR">CLEAR</option>
             <option value="SOURCE_UNAVAILABLE">SOURCE_UNAVAILABLE</option>
             <option value="RISK_CONTEXT">RISK_CONTEXT</option>
           </Select>
-          <Button size="sm" disabled={scenarioMutation.isPending} onClick={() => scenarioMutation.mutate()}>
+          <Button className="w-full sm:w-auto" size="sm" disabled={scenarioMutation.isPending} onClick={() => scenarioMutation.mutate()}>
             Criar caso demo
           </Button>
         </div>

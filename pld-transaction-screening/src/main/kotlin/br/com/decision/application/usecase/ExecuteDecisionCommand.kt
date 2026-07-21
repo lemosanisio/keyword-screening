@@ -9,5 +9,7 @@ data class ExecuteDecisionCommand(
     val transactionId: TransactionId,
     val customerId: CustomerId,
     val ruleCode: RuleCode,
-    val detectionResult: DetectionResult
+    val detectionResult: DetectionResult,
+    val correlationId: String? = null,
+    val causationId: String? = null,
 )

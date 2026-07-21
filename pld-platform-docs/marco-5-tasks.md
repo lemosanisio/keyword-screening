@@ -1,6 +1,6 @@
 # Marco 5 — evidências simuladas e prontidão decisória
 
-Status: em andamento
+Status: concluído e validado
 
 ## Objetivo
 
@@ -69,7 +69,7 @@ WAIVED
 - [x] Expor workspace agregado com matriz e readiness.
 - [x] Atualizar frontend para exibir matriz de requisitos.
 - [x] Desabilitar decisão na UI quando backend indicar bloqueio.
-- [ ] Validar fluxo ponta a ponta no Chromium.
+- [x] Validar fluxo ponta a ponta no Chromium.
 
 ## Critérios de aceite
 

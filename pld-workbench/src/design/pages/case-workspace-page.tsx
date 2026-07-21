@@ -71,6 +71,7 @@ export function CaseWorkspacePage() {
       {conflict && <Button size="sm" variant="outline" onClick={refresh}>Recarregar dados do caso</Button>}
       <CaseWorkspaceTemplate
         detail={detail}
+        actorRole={actor.role}
         conflict={conflict}
         busy={mutate.isPending}
         onAssign={() => mutate.mutate(() => assignCase(caseId, version, actor))}

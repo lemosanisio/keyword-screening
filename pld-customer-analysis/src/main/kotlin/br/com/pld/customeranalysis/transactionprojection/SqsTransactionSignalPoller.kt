@@ -47,17 +47,24 @@ class SqsTransactionSignalPoller(
 
         val result = when (eventType) {
             "TransactionSignalDetected" -> transactionSignalConsumer.consume(body)
-            else -> return
+            else -> {
+                meterRegistry.counter("pld.sqs.inbound.messages.unsupported", "eventType", "UNKNOWN").increment()
+                return
+            }
         }
 
         if (result == InboxProcessingResult.PROCESSED || result == InboxProcessingResult.DUPLICATE) {
-            sqsClient.deleteMessage(
-                DeleteMessageRequest.builder()
-                    .queueUrl(properties.transactionSignalsQueueUrl)
-                    .receiptHandle(message.receiptHandle())
-                    .build(),
-            )
-            meterRegistry.counter("pld.sqs.inbound.messages.deleted", "eventType", eventType).increment()
+            delete(message, eventType)
         }
+    }
+
+    private fun delete(message: Message, metricEventType: String) {
+        sqsClient.deleteMessage(
+            DeleteMessageRequest.builder()
+                .queueUrl(properties.transactionSignalsQueueUrl)
+                .receiptHandle(message.receiptHandle())
+                .build(),
+        )
+        meterRegistry.counter("pld.sqs.inbound.messages.deleted", "eventType", metricEventType).increment()
     }
 }

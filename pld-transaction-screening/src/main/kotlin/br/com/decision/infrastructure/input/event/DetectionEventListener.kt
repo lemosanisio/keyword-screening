@@ -48,7 +48,9 @@ class DetectionEventListener(
             transactionId = event.transactionId,
             customerId = event.customerId,
             ruleCode = event.ruleCode,
-            detectionResult = event.detectionResult
+            detectionResult = event.detectionResult,
+            correlationId = event.traceId.value,
+            causationId = event.eventId.value,
         )
 
         executeDecisionUseCase.execute(command)

@@ -1,4 +1,4 @@
-import type { CaseDetailView } from "@/api/types";
+import type { CaseDetailView, DevActor } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PriorityBadge } from "@/design/atoms/priority-badge";
@@ -12,17 +12,18 @@ type CaseHeaderProps = {
   onReturnToQueue: () => void;
   onApprove: () => void;
   onComplete: () => void;
+  actorRole: DevActor["role"];
   busy: boolean;
 };
 
-export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue, onApprove, onComplete, busy }: CaseHeaderProps) {
+export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue, onApprove, onComplete, actorRole, busy }: CaseHeaderProps) {
   const actions = new Set(detail.availableActions);
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-sm font-semibold">{detail.case.caseId}</span>
+            <span className="break-all font-mono text-sm font-semibold">{detail.case.caseId}</span>
             <StatusBadge status={detail.case.status} />
             <PriorityBadge priority={detail.case.priority} />
             <VersionTag version={detail.case.version} />
@@ -35,7 +36,7 @@ export function CaseHeader({ detail, onAssign, onStartAnalysis, onReturnToQueue,
           {actions.has("ASSIGN") && <Button disabled={busy} size="sm" onClick={onAssign}>Assumir</Button>}
           {actions.has("START_ANALYSIS") && <Button disabled={busy} size="sm" onClick={onStartAnalysis}>Iniciar análise</Button>}
           {actions.has("RETURN_TO_QUEUE") && <Button disabled={busy} size="sm" variant="outline" onClick={onReturnToQueue}>Devolver</Button>}
-          {actions.has("APPROVE_DECISION") && <Button disabled={busy} size="sm" onClick={onApprove}>Aprovar decisão</Button>}
+          {actions.has("APPROVE_DECISION") && actorRole === "APPROVER" && <Button disabled={busy} size="sm" onClick={onApprove}>Aprovar decisão</Button>}
           {actions.has("COMPLETE_CASE") && <Button disabled={busy || !detail.completionReadiness.allowed} size="sm" onClick={onComplete}>Concluir caso</Button>}
         </div>
       </CardContent>

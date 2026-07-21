@@ -35,7 +35,7 @@ export function DevActorSwitcher() {
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="text-muted-foreground">Ator dev</span>
-      <Select className="h-8 w-44" value={actor.id} onChange={(event) => setActorId(event.target.value)}>
+      <Select aria-label="Ator dev" className="h-8 w-44" value={actor.id} onChange={(event) => setActorId(event.target.value)}>
         {actors.map((candidate) => (
           <option key={candidate.id} value={candidate.id}>
             {candidate.label} / {candidate.role}

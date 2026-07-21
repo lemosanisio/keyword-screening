@@ -5,6 +5,8 @@ import br.com.decision.domain.event.DecisionMadeEvent
 import br.com.decision.domain.model.enums.Action
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
@@ -20,6 +22,7 @@ class DecisionMadeEventListener(
     private val log = LoggerFactory.getLogger(DecisionMadeEventListener::class.java)
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handle(event: DecisionMadeEvent) {
         if (Action.GENERATE_ALERT in event.actions) {
             log.info(

@@ -43,6 +43,7 @@ services:
       - "4566:4566"
     volumes:
       - localstack_data:/var/lib/localstack
+      - ./localstack-init.sh:/etc/localstack/init/ready.d/10-create-queues.sh:ro
 
 #  app:
 #    build:

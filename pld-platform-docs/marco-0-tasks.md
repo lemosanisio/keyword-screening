@@ -25,7 +25,7 @@ Primeiro código do Marco 0. TDD: teste primeiro, sempre.
 
 - [x] M0.3.1 Harness fixture↔schema rodando em `pld-transaction-screening` (scan parametrizado de `fixtures/`): falha se qualquer fixture violar seu schema
 - [x] M0.3.2 Tolerância a campo desconhecido: fixture com campo extra não falha a validação de consumidor (regra já prevista nos contratos)
-- [ ] M0.3.3 (Quando houver produtor real, em Marcos seguintes) evento emitido valida contra schema antes de publicar
+- [ ] M0.3.3 Evento real `TransactionSignalDetected.v1` possui contract test no Marco 6; validação runtime antes da publicação continua pendente
 
 ## M0.4 — Mapa de compatibilidade das APIs atuais
 

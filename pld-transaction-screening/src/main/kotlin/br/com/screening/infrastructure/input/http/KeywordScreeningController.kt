@@ -13,11 +13,12 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class KeywordScreeningController(
-    private val evaluateKeywordScreeningUseCase: EvaluateKeywordScreeningUseCase
+    private val evaluateKeywordScreeningUseCase: EvaluateKeywordScreeningUseCase,
 ) : KeywordScreeningApi {
 
     override fun evaluateKeywordScreening(
-        evaluateKeywordScreeningRequest: EvaluateKeywordScreeningRequest
+        evaluateKeywordScreeningRequest: EvaluateKeywordScreeningRequest,
+        xCorrelationId: String?,
     ): ResponseEntity<EvaluateKeywordScreeningResponse> {
         // Validação de blank (minLength no OpenAPI não cobre whitespace-only)
         require(evaluateKeywordScreeningRequest.transactionId.isNotBlank()) { "transactionId é obrigatório" }
@@ -27,7 +28,8 @@ class KeywordScreeningController(
         val command = EvaluateKeywordScreeningCommand(
             transactionId = TransactionId(evaluateKeywordScreeningRequest.transactionId),
             customerId = CustomerId(evaluateKeywordScreeningRequest.customerId),
-            description = evaluateKeywordScreeningRequest.description
+            description = evaluateKeywordScreeningRequest.description,
+            correlationId = xCorrelationId?.takeIf(String::isNotBlank),
         )
         val result = evaluateKeywordScreeningUseCase.execute(command)
         val response = EvaluateKeywordScreeningResponse(

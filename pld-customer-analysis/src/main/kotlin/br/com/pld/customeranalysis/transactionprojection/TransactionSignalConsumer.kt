@@ -26,6 +26,7 @@ class TransactionSignalConsumer(
     private val caseService: CaseService,
     private val objectMapper: ObjectMapper,
     private val meterRegistry: MeterRegistry,
+    private val properties: TransactionSignalProperties,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     fun consume(eventJson: String): InboxProcessingResult {
@@ -70,7 +71,10 @@ class TransactionSignalConsumer(
         )
         meterRegistry.counter("pld.transaction.signals.consumed", "severity", event.severity).increment()
 
-        if (event.recommendedRoute == "DERIVED_TO_ANALYST" || event.recommendedRoute == "MANDATORY_SECOND_APPROVAL") {
+        if (
+            properties.caseCreationEnabled &&
+            (event.recommendedRoute == "DERIVED_TO_ANALYST" || event.recommendedRoute == "MANDATORY_SECOND_APPROVAL")
+        ) {
             caseService.recordTransactionSignal(
                 RecordTransactionSignalCaseCommand(
                     partyId = event.partyId,
@@ -106,26 +110,31 @@ class TransactionSignalConsumer(
         val eventVersion = requiredInt("eventVersion")
         require(eventVersion == 1) { "Unsupported TransactionSignalDetected version: $eventVersion" }
 
+        val producer = requiredText("producer")
+        require(producer == properties.acceptedProducer) { "Unsupported producer: $producer" }
+        require(requiredText("dataClassification") in DATA_CLASSIFICATIONS) { "Unsupported dataClassification" }
+        Instant.parse(requiredText("publishedAt"))
+
         val subject = requiredObject("subject")
         val actor = requiredObject("actor")
         val payload = requiredObject("payload")
 
         return TransactionSignalEvent(
-            eventId = requiredText("eventId"),
+            eventId = requiredText("eventId").requireMatches(EVENT_ID_REGEX, "eventId"),
             eventType = eventType,
             eventVersion = eventVersion,
             occurredAt = Instant.parse(requiredText("occurredAt")),
             correlationId = requiredText("correlationId"),
             actorType = actor.requiredText("type"),
             actorId = actor.requiredText("id"),
-            partyId = subject.requiredText("partyId"),
+            partyId = subject.requiredText("partyId").requireMatches(PARTY_ID_REGEX, "partyId"),
             analysisCycleId = subject.optionalText("analysisCycleId"),
-            signalId = payload.requiredText("signalId"),
-            evaluationId = payload.requiredText("evaluationId"),
-            transactionId = payload.requiredText("transactionId"),
-            signalType = payload.requiredText("signalType"),
-            severity = payload.requiredText("severity"),
-            recommendedRoute = payload.optionalText("recommendedRoute"),
+            signalId = payload.requiredText("signalId").requireMatches(SIGNAL_ID_REGEX, "signalId"),
+            evaluationId = payload.requiredText("evaluationId").requireMatches(EVALUATION_ID_REGEX, "evaluationId"),
+            transactionId = payload.requiredText("transactionId").requireMatches(TRANSACTION_ID_REGEX, "transactionId"),
+            signalType = payload.requiredText("signalType").takeIf { it in SIGNAL_TYPES } ?: "UNKNOWN",
+            severity = payload.requiredText("severity").takeIf { it in SEVERITIES } ?: "UNKNOWN",
+            recommendedRoute = payload.optionalText("recommendedRoute")?.takeIf { it in ROUTES } ?: "UNKNOWN",
             riskProfileVersion = payload.optionalInt("riskProfileVersion"),
             ruleMatches = payload.requiredArray("ruleMatches").map {
                 TransactionRuleMatch(
@@ -171,8 +180,22 @@ class TransactionSignalConsumer(
         return value?.takeIf { it.isInt }?.asInt()
     }
 
+    private fun String.requireMatches(regex: Regex, fieldName: String): String {
+        require(regex.matches(this)) { "$fieldName has invalid format" }
+        return this
+    }
+
     companion object {
         const val CONSUMER_NAME = "pld-customer-analysis.transaction-signal-detected"
+        private val EVENT_ID_REGEX = Regex("^[0-9A-HJKMNP-TV-Z]{26}$")
+        private val PARTY_ID_REGEX = Regex("^pty_[0-9A-HJKMNP-TV-Z]{26}$")
+        private val SIGNAL_ID_REGEX = Regex("^sig_[0-9A-HJKMNP-TV-Z]{26}$")
+        private val EVALUATION_ID_REGEX = Regex("^evl_[0-9A-HJKMNP-TV-Z]{26}$")
+        private val TRANSACTION_ID_REGEX = Regex("^txn_[0-9A-HJKMNP-TV-Z]{26}$")
+        private val DATA_CLASSIFICATIONS = setOf("INTERNAL", "CONFIDENTIAL", "RESTRICTED")
+        private val SIGNAL_TYPES = setOf("RULE_MATCH")
+        private val SEVERITIES = setOf("LOW", "MEDIUM", "HIGH", "CRITICAL")
+        private val ROUTES = setOf("AUTOMATIC", "DERIVED_TO_ANALYST", "MANDATORY_SECOND_APPROVAL", "TECHNICAL_RETRY")
     }
 }
 

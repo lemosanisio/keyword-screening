@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "bunx",
+        "@playwright/mcp@latest",
+        "--headless",
+        "--isolated",
+        "--executable-path",
+        "/usr/bin/chromium",
+        "--output-dir",
+        "/tmp/opencode/playwright",
+        "--console-level",
+        "warning"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}

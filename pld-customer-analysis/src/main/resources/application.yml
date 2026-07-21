@@ -41,6 +41,9 @@ springdoc:
     path: /swagger-ui.html
 
 pld:
+  transaction-signals:
+    case-creation-enabled: ${PLD_TRANSACTION_SIGNALS_CASE_CREATION_ENABLED:true}
+    accepted-producer: ${PLD_TRANSACTION_SIGNALS_ACCEPTED_PRODUCER:pld-transaction-screening}
   integration:
     outbox-drain:
       enabled: ${PLD_INTEGRATION_OUTBOX_DRAIN_ENABLED:false}

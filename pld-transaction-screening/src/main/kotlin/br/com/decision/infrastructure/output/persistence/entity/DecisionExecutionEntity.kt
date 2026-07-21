@@ -50,6 +50,18 @@ class DecisionExecutionEntity(
     @Column(name = "trace_id", length = 100)
     val traceId: String? = null,
 
+    @Column(name = "evaluation_id", length = 30)
+    val evaluationId: String? = null,
+
+    @Column(name = "party_id", length = 30)
+    val partyId: String? = null,
+
+    @Column(name = "correlation_id", length = 128)
+    val correlationId: String? = null,
+
+    @Column(name = "causation_id", length = 128)
+    val causationId: String? = null,
+
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now()
 )

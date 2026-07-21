@@ -1058,6 +1058,13 @@ paths:
         - FINANCIAL_CRIME — Crime financeiro genérico
         - SANCTIONS — Sanções internacionais
       operationId: evaluateKeywordScreening
+      parameters:
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          description: Identificador de correlação propagado até eventos de integração.
+          schema:
+            type: string
       requestBody:
         required: true
         content:

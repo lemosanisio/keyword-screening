@@ -15,13 +15,16 @@ import br.com.screening.domain.service.TextNormalizer
 import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.CustomerId
 import br.com.shared.domain.valueobject.EventId
+import br.com.shared.domain.valueobject.PrefixedUlid
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.util.UUID
 
 @Service
+@Transactional
 class KeywordScreeningService(
     private val textNormalizer: TextNormalizer,
     private val keywordMatcher: KeywordMatcher,
@@ -50,8 +53,8 @@ class KeywordScreeningService(
 
         // Publish DetectionEvent
         val detectionEvent = DetectionEvent(
-            eventId = EventId(UUID.randomUUID().toString()),
-            traceId = TraceId(UUID.randomUUID().toString()),
+            eventId = EventId(PrefixedUlid.ulid()),
+            traceId = TraceId(command.correlationId ?: PrefixedUlid.ulid()),
             timestamp = Instant.now(),
             transactionId = command.transactionId,
             customerId = command.customerId,

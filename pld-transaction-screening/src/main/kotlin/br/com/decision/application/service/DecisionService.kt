@@ -20,6 +20,7 @@ import br.com.decision.domain.model.vo.FactValue
 import br.com.decision.domain.model.vo.RuleId
 import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.EventId
+import br.com.shared.domain.valueobject.PrefixedUlid
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
 import org.slf4j.LoggerFactory
@@ -57,7 +58,8 @@ class DecisionService(
     }
 
     override fun execute(command: ExecuteDecisionCommand): DecisionResult {
-        val traceId = TraceId(UUID.randomUUID().toString())
+        val correlationId = command.correlationId ?: PrefixedUlid.ulid()
+        val traceId = TraceId(correlationId)
 
         // 1. Buscar RuleDefinition pelo ruleCode
         val ruleDefinition = ruleDefinitionRepository.findByCode(command.ruleCode)
@@ -110,6 +112,7 @@ class DecisionService(
 
         // 5. Invocar DecisionEngine
         val decisionResult = decisionEngine.evaluate(detectionEvent, activeConfig, traceId)
+        val evaluationId = PrefixedUlid.next("evl_")
 
         // 6. Persistir DecisionExecution (com retry 3x para DataAccessException)
         val execution = buildDecisionExecution(
@@ -120,13 +123,17 @@ class DecisionService(
             result = decisionResult,
             explanation = decisionResult.explanation ?: DecisionExplanation(traceId = traceId, steps = emptyList()),
             executionTimeMs = decisionResult.executionTimeMs,
-            traceId = traceId
+            traceId = traceId,
+            evaluationId = evaluationId,
+            partyId = command.customerId.value.takeIf(::isTypedPartyId),
+            correlationId = correlationId,
+            causationId = command.causationId,
         )
         val savedExecution = saveWithRetry(execution)
 
         // 7. Publicar DecisionMadeEvent
         val event = DecisionMadeEvent(
-            eventId = EventId(UUID.randomUUID().toString()),
+            eventId = EventId(PrefixedUlid.ulid()),
             traceId = traceId,
             timestamp = Instant.now(),
             transactionId = command.transactionId,
@@ -139,7 +146,10 @@ class DecisionService(
             matchedExpressions = decisionResult.matchedExpressions,
             configurationVersion = decisionResult.configurationVersion,
             executionTimeMs = decisionResult.executionTimeMs,
-            explanation = decisionResult.explanation ?: DecisionExplanation(traceId = traceId, steps = emptyList())
+            explanation = decisionResult.explanation ?: DecisionExplanation(traceId = traceId, steps = emptyList()),
+            evaluationId = savedExecution.evaluationId,
+            correlationId = savedExecution.correlationId,
+            causationId = savedExecution.causationId,
         )
         domainEventPublisher.publish(event)
 
@@ -196,7 +206,7 @@ class DecisionService(
 
     private fun buildDetectionEvent(command: ExecuteDecisionCommand, traceId: TraceId): DetectionEvent {
         return DetectionEvent(
-            eventId = EventId(UUID.randomUUID().toString()),
+            eventId = EventId(PrefixedUlid.ulid()),
             traceId = traceId,
             timestamp = Instant.now(),
             transactionId = command.transactionId,
@@ -214,7 +224,11 @@ class DecisionService(
         result: DecisionResult,
         explanation: DecisionExplanation,
         executionTimeMs: Long,
-        traceId: TraceId
+        traceId: TraceId,
+        evaluationId: String? = null,
+        partyId: String? = null,
+        correlationId: String? = null,
+        causationId: String? = null,
     ): DecisionExecution {
         return DecisionExecution(
             id = UUID.randomUUID(),
@@ -226,7 +240,15 @@ class DecisionService(
             explanation = explanation,
             executionTimeMs = executionTimeMs,
             traceId = traceId,
-            timestamp = Instant.now()
+            timestamp = Instant.now(),
+            evaluationId = evaluationId,
+            partyId = partyId,
+            correlationId = correlationId,
+            causationId = causationId,
         )
     }
+
+    private fun isTypedPartyId(value: String): Boolean = PARTY_ID_REGEX.matches(value)
+
+    private val PARTY_ID_REGEX = Regex("^pty_[0-9A-HJKMNP-TV-Z]{26}$")
 }

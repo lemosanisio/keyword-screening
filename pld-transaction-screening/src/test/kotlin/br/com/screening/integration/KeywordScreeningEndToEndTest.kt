@@ -52,6 +52,7 @@ class KeywordScreeningEndToEndTest {
         val requestBody = """
             {
                 "transactionId": "txn-e2e-001",
+                "customerId": "CUST-E2E-001",
                 "description": "Pagamento relacionado a terrorismo internacional"
             }
         """.trimIndent()
@@ -80,6 +81,7 @@ class KeywordScreeningEndToEndTest {
         val requestBody = """
             {
                 "transactionId": "$transactionId",
+                "customerId": "CUST-E2E-002",
                 "description": "Operacao suspeita de lavagem de dinheiro"
             }
         """.trimIndent()
@@ -106,6 +108,7 @@ class KeywordScreeningEndToEndTest {
         val requestBody = """
             {
                 "transactionId": "$transactionId",
+                "customerId": "CUST-E2E-003",
                 "description": "Transacao envolvendo fraude comprovada"
             }
         """.trimIndent()

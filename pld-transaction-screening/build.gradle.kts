@@ -27,6 +27,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("software.amazon.awssdk:sqs")
 
     // Database
     implementation("org.flywaydb:flyway-core")
@@ -58,6 +59,7 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("org.testcontainers:testcontainers-bom:1.20.3")
+        mavenBom("software.amazon.awssdk:bom:2.27.21")
     }
 }
 

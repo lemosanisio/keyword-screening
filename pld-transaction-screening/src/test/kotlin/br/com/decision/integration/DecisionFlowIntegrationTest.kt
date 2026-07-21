@@ -5,20 +5,32 @@ import br.com.decision.domain.event.DetectionMatch
 import br.com.decision.domain.event.DetectionResult
 import br.com.decision.domain.model.enums.CustomerRisk
 import br.com.decision.domain.port.CustomerRiskPort
+import br.com.integration.IntegrationEventPublisher
+import br.com.integration.IntegrationOutboxEntity
+import br.com.integration.IntegrationOutboxRepository
+import br.com.integration.OutboxDrainService
+import br.com.integration.OutboxStatus
 import br.com.decision.domain.model.vo.RuleCode
 import br.com.shared.domain.valueobject.CustomerId
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
+import br.com.screening.application.usecase.EvaluateKeywordScreeningCommand
+import br.com.screening.application.usecase.EvaluateKeywordScreeningUseCase
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.networknt.schema.JsonSchemaFactory
+import com.networknt.schema.SpecVersion
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.event.EventListener
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
@@ -28,6 +40,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.Instant
+import java.nio.file.Path
 import java.util.UUID
 
 /**
@@ -36,7 +49,10 @@ import java.util.UUID
  *
  * Validates: Requirements 4.7, 9.1, 10.2, 12.2
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = ["pld.integration.transaction-signals.enabled=true"],
+)
 @Testcontainers
 class DecisionFlowIntegrationTest {
 
@@ -48,6 +64,24 @@ class DecisionFlowIntegrationTest {
 
     @Autowired
     private lateinit var customerRiskPort: CustomerRiskPort
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    private lateinit var outboxRepository: IntegrationOutboxRepository
+
+    @Autowired
+    private lateinit var outboxDrainService: OutboxDrainService
+
+    @Autowired
+    private lateinit var integrationEventPublisher: ControllableIntegrationEventPublisher
+
+    @Autowired
+    private lateinit var evaluateKeywordScreeningUseCase: EvaluateKeywordScreeningUseCase
+
+    @Autowired
+    private lateinit var failOnceDecisionListener: FailOnceDecisionListener
 
     companion object {
         @Container
@@ -81,6 +115,14 @@ class DecisionFlowIntegrationTest {
                 }
             }
         }
+
+        @Bean
+        @Primary
+        fun integrationEventPublisher(): ControllableIntegrationEventPublisher =
+            ControllableIntegrationEventPublisher()
+
+        @Bean
+        fun failOnceDecisionListener(): FailOnceDecisionListener = FailOnceDecisionListener()
     }
 
     @Test
@@ -149,6 +191,11 @@ class DecisionFlowIntegrationTest {
             transactionId
         )
         assertEquals("OPEN", alertStatus)
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE envelope -> 'payload' ->> 'transactionId' = ?",
+            Long::class.java,
+            transactionId,
+        ))
     }
 
     @Test
@@ -198,6 +245,162 @@ class DecisionFlowIntegrationTest {
             transactionId
         )
         assertEquals(1L, alertCount)
+    }
+
+    @Test
+    fun `typed transaction and party produce one schema-valid signal outbox`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val transactionId = "txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H"
+        val partyId = "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D"
+        val correlationId = "01J6ZK7Q3W8K0M2N4P6R8T0V2B"
+
+        applicationEventPublisher.publishEvent(
+            DetectionEvent(
+                eventId = EventId("01J6ZK7Q3W8K0M2N4P6R8T0V2C"),
+                traceId = TraceId(correlationId),
+                timestamp = Instant.now(),
+                transactionId = TransactionId(transactionId),
+                customerId = CustomerId(partyId),
+                ruleCode = RuleCode("KEYWORD_SCREENING"),
+                detectionResult = DetectionResult(
+                    matched = true,
+                    matches = listOf(DetectionMatch(term = "lavagem", category = "AML")),
+                ),
+            ),
+        )
+
+        val evaluationId = jdbcTemplate.queryForObject(
+            "SELECT evaluation_id FROM decision_execution WHERE transaction_id = ?",
+            String::class.java,
+            transactionId,
+        )
+        assertTrue(evaluationId!!.matches(Regex("^evl_[0-9A-HJKMNP-TV-Z]{26}$")))
+        assertEquals(partyId, jdbcTemplate.queryForObject(
+            "SELECT party_id FROM decision_execution WHERE transaction_id = ?",
+            String::class.java,
+            transactionId,
+        ))
+        assertEquals(correlationId, jdbcTemplate.queryForObject(
+            "SELECT correlation_id FROM decision_execution WHERE transaction_id = ?",
+            String::class.java,
+            transactionId,
+        ))
+
+        val envelope = objectMapper.readTree(
+            jdbcTemplate.queryForObject(
+                "SELECT envelope::text FROM integration_outbox WHERE aggregate_id = ?",
+                String::class.java,
+                evaluationId,
+            ),
+        ).deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+        envelope.put("publishedAt", Instant.now().toString())
+
+        val schemaPath = Path.of(System.getProperty("user.dir"))
+            .resolveSibling("pld-platform-docs/schemas/v1/TransactionSignalDetected.schema.json")
+        val errors = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
+            .getSchema(schemaPath.toUri())
+            .validate(envelope)
+
+        assertTrue(errors.isEmpty(), errors.joinToString("\n"))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE aggregate_id = ?",
+            Long::class.java,
+            evaluationId,
+        ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM alert WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+    }
+
+    @Test
+    fun `outbox retry preserves event identity until publication succeeds`() {
+        jdbcTemplate.update("DELETE FROM integration_outbox")
+        integrationEventPublisher.calls.clear()
+        val eventId = br.com.shared.domain.valueobject.PrefixedUlid.ulid()
+        val envelope = """{"eventId":"$eventId","eventType":"TransactionSignalDetected"}"""
+        outboxRepository.saveAndFlush(
+            IntegrationOutboxEntity(
+                eventId = eventId,
+                eventType = "TransactionSignalDetected",
+                eventVersion = 1,
+                aggregateType = "TransactionEvaluation",
+                aggregateId = br.com.shared.domain.valueobject.PrefixedUlid.next("evl_"),
+                envelope = envelope,
+                occurredAt = Instant.now(),
+                nextAttemptAt = Instant.EPOCH,
+            ),
+        )
+        integrationEventPublisher.failNext = true
+
+        assertEquals(0, outboxDrainService.publishPending(10))
+        val failed = outboxRepository.findById(eventId).orElseThrow()
+        assertEquals(OutboxStatus.PENDING, failed.status)
+        assertEquals(1, failed.attemptCount)
+        assertEquals(eventId, objectMapper.readTree(failed.envelope).required("eventId").asText())
+
+        failed.nextAttemptAt = Instant.EPOCH
+        outboxRepository.saveAndFlush(failed)
+        assertEquals(1, outboxDrainService.publishPending(10))
+
+        val published = outboxRepository.findById(eventId).orElseThrow()
+        assertEquals(OutboxStatus.PUBLISHED, published.status)
+        assertEquals(eventId, objectMapper.readTree(published.envelope).required("eventId").asText())
+        assertEquals(2, integrationEventPublisher.calls.count { it == eventId })
+    }
+
+    @Test
+    fun `failure after screening rolls back and retry creates decision and outbox`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val transactionId = br.com.shared.domain.valueobject.PrefixedUlid.next("txn_")
+        val partyId = br.com.shared.domain.valueobject.PrefixedUlid.next("pty_")
+        failOnceDecisionListener.failNextForParty = partyId
+        val command = EvaluateKeywordScreeningCommand(
+            transactionId = TransactionId(transactionId),
+            customerId = CustomerId(partyId),
+            description = "pagamento relacionado a lavagem de dinheiro",
+            correlationId = "rollback-retry-correlation",
+        )
+
+        assertThrows(RuntimeException::class.java) {
+            evaluateKeywordScreeningUseCase.execute(command)
+        }
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rule_execution WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM decision_execution WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE envelope -> 'payload' ->> 'transactionId' = ?",
+            Long::class.java,
+            transactionId,
+        ))
+
+        evaluateKeywordScreeningUseCase.execute(command)
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rule_execution WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM decision_execution WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE envelope -> 'payload' ->> 'transactionId' = ?",
+            Long::class.java,
+            transactionId,
+        ))
     }
 
     @Test
@@ -277,6 +480,31 @@ class DecisionFlowIntegrationTest {
         )
         if (existing == 0L) {
             insertActiveRuleConfiguration(ruleId)
+        }
+    }
+}
+
+class ControllableIntegrationEventPublisher : IntegrationEventPublisher {
+    var failNext: Boolean = false
+    val calls = mutableListOf<String>()
+
+    override fun publish(eventId: String, eventType: String, envelope: String, publishedAt: Instant) {
+        calls += eventId
+        if (failNext) {
+            failNext = false
+            throw RuntimeException("SQS unavailable")
+        }
+    }
+}
+
+class FailOnceDecisionListener {
+    var failNextForParty: String? = null
+
+    @EventListener
+    fun fail(event: br.com.decision.domain.event.DecisionMadeEvent) {
+        if (event.customerId.value == failNextForParty) {
+            failNextForParty = null
+            throw RuntimeException("simulated failure after screening persistence")
         }
     }
 }

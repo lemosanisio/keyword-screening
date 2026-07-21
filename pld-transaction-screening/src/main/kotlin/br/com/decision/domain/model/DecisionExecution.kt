@@ -24,5 +24,9 @@ data class DecisionExecution(
     val explanation: DecisionExplanation,
     val executionTimeMs: Long,
     val traceId: TraceId,
-    val timestamp: Instant
+    val timestamp: Instant,
+    val evaluationId: String? = null,
+    val partyId: String? = null,
+    val correlationId: String? = null,
+    val causationId: String? = null,
 )

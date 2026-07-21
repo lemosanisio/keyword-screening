@@ -64,6 +64,32 @@ class TransactionSignalConsumerIntegrationTest {
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
     }
 
+    @Test
+    fun `normalizes unknown vocabularies without opening a case`() {
+        val partyId = partyService.create(
+            CreatePartyCommand(
+                partyType = PartyType.PERSON,
+                officialName = "Vocabulário Futuro",
+                sourceSystem = "manual",
+                actor = Actor(id = "analyst-1", role = ActorRole.ANALYST),
+                correlationId = "corr-party-create",
+            ),
+        ).partyId
+        val event = transactionSignalDetectedEvent(partyId)
+            .replace("\"signalType\": \"RULE_MATCH\"", "\"signalType\": \"FUTURE_SIGNAL\"")
+            .replace("\"severity\": \"HIGH\"", "\"severity\": \"FUTURE_SEVERITY\"")
+            .replace("\"recommendedRoute\": \"DERIVED_TO_ANALYST\"", "\"recommendedRoute\": \"FUTURE_ROUTE\"")
+
+        assertThat(transactionSignalConsumer.consume(event)).isEqualTo(InboxProcessingResult.PROCESSED)
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from pld_case", Long::class.java)).isZero()
+        assertThat(jdbcTemplate.queryForList(
+            "select summary_code from timeline_entry where party_id = ? order by recorded_at, id",
+            String::class.java,
+            partyId,
+        )).containsExactly("PARTY_CREATED", "TRANSACTION_SIGNAL_DETECTED_UNKNOWN")
+    }
+
     private fun caseId(): String = jdbcTemplate.queryForObject(
         "select id from pld_case",
         String::class.java,

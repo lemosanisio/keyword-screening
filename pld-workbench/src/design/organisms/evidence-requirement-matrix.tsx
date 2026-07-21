@@ -29,7 +29,7 @@ export function EvidenceRequirementMatrix({ matrix, busy, onRetry }: EvidenceReq
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="font-medium">{requirement.title}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 break-all text-xs text-muted-foreground">
                     {requirement.code} · {requirement.category} · {requirement.mandatory ? "obrigatório" : "opcional"}
                   </div>
                 </div>
@@ -52,7 +52,7 @@ export function EvidenceRequirementMatrix({ matrix, busy, onRetry }: EvidenceReq
                       <div className="mt-1 text-muted-foreground">{evidence.summary}</div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {evidence.facts.map((fact) => (
-                          <span key={fact.factId} className="rounded border px-1.5 py-0.5 font-mono text-[11px]">
+                          <span key={fact.factId} className="max-w-full break-all rounded border px-1.5 py-0.5 font-mono text-[11px]">
                             {fact.factCode}: {String(fact.value)} / {fact.quality}
                           </span>
                         ))}

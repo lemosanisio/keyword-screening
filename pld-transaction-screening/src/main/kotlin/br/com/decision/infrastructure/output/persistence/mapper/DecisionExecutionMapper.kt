@@ -41,7 +41,11 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
             explanation = mapToExplanation(entity.explanation),
             executionTimeMs = entity.executionTimeMs,
             traceId = TraceId(entity.traceId ?: "unknown"),
-            timestamp = entity.createdAt
+            timestamp = entity.createdAt,
+            evaluationId = entity.evaluationId,
+            partyId = entity.partyId,
+            correlationId = entity.correlationId,
+            causationId = entity.causationId,
         )
 
     fun toEntity(domain: DecisionExecution): DecisionExecutionEntity =
@@ -58,6 +62,10 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
             explanation = mapFromExplanation(domain.explanation),
             executionTimeMs = domain.executionTimeMs,
             traceId = domain.traceId.value,
+            evaluationId = domain.evaluationId,
+            partyId = domain.partyId,
+            correlationId = domain.correlationId,
+            causationId = domain.causationId,
             createdAt = domain.timestamp
         )
 

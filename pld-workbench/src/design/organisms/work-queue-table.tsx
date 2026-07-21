@@ -13,8 +13,8 @@ export function WorkQueueTable({ cases }: { cases: CaseQueueItem[] }) {
         <CardTitle>Fila única</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-hidden rounded-lg border">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="min-w-[56rem] w-full text-left text-sm">
             <thead className="bg-muted text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">Prioridade</th>

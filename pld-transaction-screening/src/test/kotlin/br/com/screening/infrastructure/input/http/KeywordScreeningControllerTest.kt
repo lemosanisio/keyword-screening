@@ -33,7 +33,8 @@ class KeywordScreeningControllerTest {
         val command = EvaluateKeywordScreeningCommand(
             transactionId = TransactionId("TX-001"),
             customerId = CustomerId("CUST-42"),
-            description = "pagamento terrorismo"
+            description = "pagamento terrorismo",
+            correlationId = "correlation-001",
         )
         val useCaseResult = EvaluateKeywordScreeningResult(
             ruleCode = "KEYWORD_SCREENING",
@@ -50,6 +51,7 @@ class KeywordScreeningControllerTest {
 
         mockMvc.post("/v1/rules/keyword-screening/evaluate") {
             contentType = MediaType.APPLICATION_JSON
+            header("X-Correlation-Id", "correlation-001")
             content = objectMapper.writeValueAsString(requestBody)
         }.andExpect {
             status { isOk() }

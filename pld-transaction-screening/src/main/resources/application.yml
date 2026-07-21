@@ -31,3 +31,20 @@ coaf:
 
 contextual-screening:
   auto-close-threshold: 0.95
+
+pld:
+  integration:
+    transaction-signals:
+      enabled: ${PLD_TRANSACTION_SIGNALS_ENABLED:false}
+      queue-url: ${PLD_TRANSACTION_SIGNALS_QUEUE_URL:}
+    sqs:
+      enabled: ${PLD_SQS_ENABLED:false}
+      region: ${AWS_REGION:us-east-1}
+      endpoint: ${PLD_SQS_ENDPOINT:}
+      access-key-id: ${AWS_ACCESS_KEY_ID:test}
+      secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
+    outbox-drain:
+      enabled: ${PLD_OUTBOX_DRAIN_ENABLED:false}
+      initial-delay: ${PLD_OUTBOX_INITIAL_DELAY:PT5S}
+      fixed-delay: ${PLD_OUTBOX_FIXED_DELAY:PT5S}
+      limit: ${PLD_OUTBOX_BATCH_SIZE:50}

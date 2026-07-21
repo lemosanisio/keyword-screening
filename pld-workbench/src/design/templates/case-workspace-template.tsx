@@ -1,4 +1,4 @@
-import type { CaseDetailView } from "@/api/types";
+import type { CaseDetailView, DevActor } from "@/api/types";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CaseCommentsPanel } from "@/design/organisms/case-comments-panel";
@@ -13,6 +13,7 @@ type CaseWorkspaceTemplateProps = {
   detail: CaseDetailView;
   conflict?: string | null;
   busy: boolean;
+  actorRole: DevActor["role"];
   onAssign: () => void;
   onStartAnalysis: () => void;
   onReturnToQueue: () => void;
@@ -30,6 +31,7 @@ export function CaseWorkspaceTemplate(props: CaseWorkspaceTemplateProps) {
       <CaseHeader
         detail={props.detail}
         busy={props.busy}
+        actorRole={props.actorRole}
         onAssign={props.onAssign}
         onStartAnalysis={props.onStartAnalysis}
         onReturnToQueue={props.onReturnToQueue}
@@ -78,9 +80,9 @@ function SignalsCard({ detail }: { detail: CaseDetailView }) {
               <span className="rounded bg-muted px-2 py-0.5 text-xs">{source.severity}</span>
             </div>
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-              <div>Evaluation: <span className="font-mono text-foreground">{source.evaluationId}</span></div>
-              <div>Transaction: <span className="font-mono text-foreground">{source.transactionId}</span></div>
-              <div>Route: <span className="font-mono text-foreground">{source.recommendedRoute}</span></div>
+              <div>Evaluation: <span className="break-all font-mono text-foreground">{source.evaluationId}</span></div>
+              <div>Transaction: <span className="break-all font-mono text-foreground">{source.transactionId}</span></div>
+              <div>Route: <span className="break-all font-mono text-foreground">{source.recommendedRoute}</span></div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {source.ruleMatches.map((rule) => (
