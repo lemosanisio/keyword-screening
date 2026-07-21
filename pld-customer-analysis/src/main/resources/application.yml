@@ -27,6 +27,11 @@ management:
 
 pld:
   integration:
+    outbox-drain:
+      enabled: ${PLD_INTEGRATION_OUTBOX_DRAIN_ENABLED:false}
+      initial-delay: ${PLD_INTEGRATION_OUTBOX_DRAIN_INITIAL_DELAY:PT5S}
+      fixed-delay: ${PLD_INTEGRATION_OUTBOX_DRAIN_FIXED_DELAY:PT5S}
+      limit: ${PLD_INTEGRATION_OUTBOX_DRAIN_LIMIT:50}
     sqs:
       enabled: ${PLD_INTEGRATION_SQS_ENABLED:false}
       region: ${PLD_INTEGRATION_SQS_REGION:us-east-1}
