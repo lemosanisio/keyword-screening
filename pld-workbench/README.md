@@ -13,4 +13,4 @@ mise exec -- bun run build
 mise exec -- bun run dev
 ```
 
-O backend esperado é o `pld-customer-analysis` em `http://localhost:8080`. Para apontar para outro backend, ajuste `globalThis.PLD_API_BASE_URL` em `index.html` neste protótipo.
+O backend esperado é o `pld-customer-analysis` em `http://localhost:8082`. Para apontar para outro backend, ajuste `globalThis.PLD_API_BASE_URL` em `index.html` neste protótipo.

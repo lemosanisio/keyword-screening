@@ -1,6 +1,6 @@
 # Marco 4 — workbench exploratório ponta a ponta
 
-Status: em andamento
+Status: primeira demo validada
 
 ## Objetivo
 
@@ -48,13 +48,13 @@ Observação: backend validado com Gradle. Frontend validado com Bun instalado v
 
 ## Critérios de aceite
 
-- [ ] Com backend rodando e cenário seedado, a fila exibe ao menos um caso.
-- [ ] O usuário abre o workspace a partir da fila.
-- [ ] O usuário assume, inicia análise e comenta no caso.
-- [ ] O usuário registra decisão não sensível e vê o caso decidido.
-- [ ] O usuário registra decisão sensível e vê pendência de aprovação.
-- [ ] O usuário troca para ator aprovador e aprova a decisão.
-- [ ] Timeline, decisões e status refletem o fluxo.
+- [x] Com backend rodando e cenário seedado, a fila exibe ao menos um caso.
+- [x] O usuário abre o workspace a partir da fila.
+- [x] O usuário assume, inicia análise e comenta no caso.
+- [x] O usuário registra decisão não sensível e vê o caso decidido.
+- [x] O usuário registra decisão sensível e vê pendência de aprovação.
+- [x] O usuário troca para ator aprovador e aprova a decisão.
+- [x] Timeline, decisões e status refletem o fluxo.
 - [x] `bun run build` passa com Bun instalado via `mise`.
 
 ## Fora deste marco
