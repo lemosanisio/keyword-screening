@@ -54,3 +54,8 @@ pld:
       access-key-id: ${PLD_INTEGRATION_SQS_ACCESS_KEY_ID:test}
       secret-access-key: ${PLD_INTEGRATION_SQS_SECRET_ACCESS_KEY:test}
       outbox-queue-url: ${PLD_INTEGRATION_SQS_OUTBOX_QUEUE_URL:}
+      inbound-enabled: ${PLD_INTEGRATION_SQS_INBOUND_ENABLED:false}
+      inbound-initial-delay: ${PLD_INTEGRATION_SQS_INBOUND_INITIAL_DELAY:PT5S}
+      inbound-fixed-delay: ${PLD_INTEGRATION_SQS_INBOUND_FIXED_DELAY:PT5S}
+      inbound-max-messages: ${PLD_INTEGRATION_SQS_INBOUND_MAX_MESSAGES:10}
+      transaction-signals-queue-url: ${PLD_INTEGRATION_SQS_TRANSACTION_SIGNALS_QUEUE_URL:}

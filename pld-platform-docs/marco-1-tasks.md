@@ -1,6 +1,6 @@
 # Marco 1 — tasks
 
-Status: em andamento  
+Status: concluído  
 Escopo: fundação vertical de `pld-customer-analysis`, conforme ADR-008.
 
 ## Concluído
@@ -19,10 +19,12 @@ Escopo: fundação vertical de `pld-customer-analysis`, conforme ADR-008.
 - [x] Testes de integração com PostgreSQL/Testcontainers cobrindo Party, AnalysisCycle, timeline, outbox e inbox.
 - [x] Segurança dev via headers (`X-Actor-Id`, `X-Actor-Role`, `X-Correlation-Id`) aplicada às APIs de escrita.
 - [x] Primeiro consumidor externo: `TransactionSignalDetected.v1` registrado idempotentemente na timeline.
+- [x] Health, info, OpenAPI/Swagger e métricas básicas via Actuator.
+- [x] Poller inbound SQS/LocalStack para consumir `TransactionSignalDetected.v1` e acionar o consumidor idempotente.
 
-## Próximo corte
+## Encerramento
 
-- [ ] Health/OpenAPI/métricas mínimos do novo backend.
+- Marco 1 fechado como fundação técnica. Próximo marco deve iniciar o modelo de `Case`/fila humana ou outro recorte de produto aprovado.
 
 ## Fora do Marco 1
 

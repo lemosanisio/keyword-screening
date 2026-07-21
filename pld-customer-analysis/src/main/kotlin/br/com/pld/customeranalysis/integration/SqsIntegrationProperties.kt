@@ -10,4 +10,9 @@ data class SqsIntegrationProperties(
     val accessKeyId: String = "test",
     val secretAccessKey: String = "test",
     val outboxQueueUrl: String = "",
+    val inboundEnabled: Boolean = false,
+    val inboundInitialDelay: String = "PT5S",
+    val inboundFixedDelay: String = "PT5S",
+    val inboundMaxMessages: Int = 10,
+    val transactionSignalsQueueUrl: String = "",
 )
