@@ -1,0 +1,35 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W5A",
+  "eventType": "PartyRelationshipChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T14:10:00Z",
+  "publishedAt": "2026-07-20T14:10:01Z",
+  "producer": "external",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0W5B",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "cadastro-master"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "sourceSystem": "cadastro-master",
+    "externalPartyRef": "master-pty-88001",
+    "relationship": {
+      "type": "SHAREHOLDER",
+      "relatedParty": {
+        "partyType": "PERSON",
+        "officialName": "João Exemplo",
+        "identifiers": [
+          {
+            "type": "CPF",
+            "value": "00000000000",
+            "country": "BR"
+          }
+        ]
+      },
+      "validFrom": "2026-07-01",
+      "validUntil": null,
+      "changeType": "ADDED"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CustomerOnboardingStarted.v1",
+  "description": "Início de onboarding publicado pelo sistema mestre de cadastro/contas. pld-customer-analysis cria/atualiza Party e abre ciclo ONBOARDING, sem pressupor decisão síncrona da conta. Proposta de contrato ao sistema mestre (EXT-2).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "CustomerOnboardingStarted" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "external" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "sourceSystem",
+            "externalOnboardingRef",
+            "partyType",
+            "officialName",
+            "identifiers",
+            "startedAt"
+          ],
+          "properties": {
+            "sourceSystem": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Sistema mestre produtor, ex.: cadastro-master. Parte da chave de idempotência."
+            },
+            "externalOnboardingRef": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Referência do processo de onboarding no sistema mestre."
+            },
+            "partyType": {
+              "enum": ["PERSON", "ORGANIZATION"]
+            },
+            "officialName": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Nome oficial conforme fonte cadastral (PII, classificar CONFIDENTIAL)."
+            },
+            "identifiers": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["type", "value"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Tipo do identificador (CPF, CNPJ, passaporte...); vocabulário aberto."
+                  },
+                  "value": { "type": "string", "minLength": 1 },
+                  "issuer": { "type": "string" },
+                  "country": { "type": "string", "pattern": "^[A-Z]{2}$" },
+                  "validUntil": { "type": ["string", "null"], "format": "date" }
+                }
+              }
+            },
+            "externalAccountRefs": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "channel": {
+              "type": "string",
+              "description": "Canal de origem; vocabulário aberto."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

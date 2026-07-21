@@ -1,0 +1,32 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W3A",
+  "eventType": "CustomerOnboardingStarted",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T14:00:00Z",
+  "publishedAt": "2026-07-20T14:00:01Z",
+  "producer": "external",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0W3B",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "cadastro-master"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "sourceSystem": "cadastro-master",
+    "externalOnboardingRef": "onb-2026-88412",
+    "partyType": "PERSON",
+    "officialName": "Maria Exemplo da Silva",
+    "identifiers": [
+      {
+        "type": "CPF",
+        "value": "00000000000",
+        "issuer": "RFB",
+        "country": "BR",
+        "validUntil": null
+      }
+    ],
+    "externalAccountRefs": ["acc-brl-99231"],
+    "startedAt": "2026-07-20T14:00:00Z",
+    "channel": "APP"
+  }
+}

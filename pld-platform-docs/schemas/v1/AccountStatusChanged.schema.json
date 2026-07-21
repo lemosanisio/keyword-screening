@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AccountStatusChanged.v1",
+  "description": "Mudança de status de conta publicada pelo sistema de contas. É o evento de confirmação que fecha o ciclo do AccountDecisionIssued (EXT-3): quando a mudança veio de comando nosso, sourceCommandId amarra no AccountActionAttempt. Vocabulário de status é do executor. Proposta de contrato ao sistema de contas (EXT-2/EXT-3).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "AccountStatusChanged" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "external" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "sourceSystem",
+            "externalAccountRef",
+            "newStatus",
+            "changedAt"
+          ],
+          "properties": {
+            "sourceSystem": {
+              "type": "string",
+              "minLength": 1
+            },
+            "externalAccountRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "previousStatus": {
+              "type": ["string", "null"],
+              "description": "Vocabulário do sistema de contas."
+            },
+            "newStatus": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Vocabulário do sistema de contas."
+            },
+            "changedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sourceCommandId": {
+              "type": "string",
+              "pattern": "^cmd_[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "Presente quando a mudança aplicou um comando idempotente nosso; liga ao AccountActionAttempt."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

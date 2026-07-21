@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionOccurred.v1",
+  "description": "Transação financeira publicada pelo sistema de pagamentos/ledger; inicia a avaliação transacional em pld-transaction-screening. Alta vazão: payload mínimo necessário às regras — nunca ficha cadastral (antiobjetivo). transactionId no padrão txn_ULID (aprovado: a chave de idempotência da avaliação depende dele). Proposta de contrato ao sistema mestre (EXT-2).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "TransactionOccurred" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "external" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "sourceSystem",
+            "transactionId",
+            "externalAccountRef",
+            "type",
+            "amount",
+            "occurredAt"
+          ],
+          "properties": {
+            "sourceSystem": {
+              "type": "string",
+              "minLength": 1
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "externalAccountRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Meio da transação (PIX, TED, boleto...); vocabulário aberto."
+            },
+            "amount": {
+              "type": "object",
+              "required": ["value", "currency"],
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "pattern": "^-?\\d+(\\.\\d+)?$",
+                  "description": "Quantia decimal como string, para preservar precisão."
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "description": "Moeda ISO 4217."
+                }
+              }
+            },
+            "occurredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "counterparty": {
+              "type": "object",
+              "description": "Dados mínimos da contraparte para regras de exposição/país.",
+              "properties": {
+                "name": { "type": "string" },
+                "identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "properties": {
+                      "type": { "type": "string", "minLength": 1 },
+                      "value": { "type": "string", "minLength": 1 },
+                      "issuer": { "type": "string" },
+                      "country": { "type": "string", "pattern": "^[A-Z]{2}$" }
+                    }
+                  }
+                },
+                "country": { "type": "string", "pattern": "^[A-Z]{2}$" }
+              }
+            },
+            "channel": {
+              "type": "string",
+              "description": "Canal de origem; vocabulário aberto."
+            }
+          }
+        }
+      }
+    }
+  ]
+}

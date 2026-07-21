@@ -1,0 +1,21 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W6A",
+  "eventType": "AccountStatusChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-21T09:16:00Z",
+  "publishedAt": "2026-07-21T09:16:01Z",
+  "producer": "external",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "account-system"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "sourceSystem": "account-system",
+    "externalAccountRef": "acc-brl-99231",
+    "previousStatus": "ACTIVE",
+    "newStatus": "RESTRICTED",
+    "changedAt": "2026-07-21T09:16:00Z"
+  }
+}

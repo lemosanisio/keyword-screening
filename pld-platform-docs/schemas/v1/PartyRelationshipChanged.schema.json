@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PartyRelationshipChanged.v1",
+  "description": "Mudança em relação societária/representação publicada pelo sistema mestre: sócio, administrador, representante, beneficiário final etc. Proposta de contrato ao sistema mestre (EXT-2).",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "PartyRelationshipChanged" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "external" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "sourceSystem",
+            "externalPartyRef",
+            "relationship"
+          ],
+          "properties": {
+            "sourceSystem": {
+              "type": "string",
+              "minLength": 1
+            },
+            "externalPartyRef": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Parte à qual a relação pertence (ex.: a PJ)."
+            },
+            "relationship": {
+              "type": "object",
+              "required": ["type", "relatedParty", "changeType"],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "SHAREHOLDER",
+                    "LEGAL_REPRESENTATIVE",
+                    "DIRECTOR",
+                    "ULTIMATE_BENEFICIAL_OWNER",
+                    "ATTORNEY",
+                    "EMPLOYEE",
+                    "SUPPLIER",
+                    "PARTNER",
+                    "OTHER"
+                  ],
+                  "description": "Vocabulário fechado do CA-FR-002."
+                },
+                "relatedParty": {
+                  "type": "object",
+                  "required": ["partyType", "officialName"],
+                  "properties": {
+                    "partyType": {
+                      "enum": ["PERSON", "ORGANIZATION"]
+                    },
+                    "officialName": { "type": "string", "minLength": 1 },
+                    "identifiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["type", "value"],
+                        "properties": {
+                          "type": { "type": "string", "minLength": 1 },
+                          "value": { "type": "string", "minLength": 1 },
+                          "issuer": { "type": "string" },
+                          "country": { "type": "string", "pattern": "^[A-Z]{2}$" },
+                          "validUntil": { "type": ["string", "null"], "format": "date" }
+                        }
+                      }
+                    }
+                  }
+                },
+                "validFrom": { "type": "string", "format": "date" },
+                "validUntil": { "type": ["string", "null"], "format": "date" },
+                "changeType": {
+                  "enum": ["ADDED", "UPDATED", "REMOVED"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

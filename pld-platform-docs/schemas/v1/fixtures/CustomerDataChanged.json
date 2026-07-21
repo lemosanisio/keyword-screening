@@ -1,0 +1,30 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W4A",
+  "eventType": "CustomerDataChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T14:05:00Z",
+  "publishedAt": "2026-07-20T14:05:01Z",
+  "producer": "external",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0W3B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0W3A",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "cadastro-master"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "sourceSystem": "cadastro-master",
+    "externalPartyRef": "master-pty-77123",
+    "changedFields": [
+      {
+        "field": "officialName",
+        "newValue": "Maria E. da Silva Souza",
+        "source": "cadastro-master",
+        "validFrom": "2026-07-20",
+        "validUntil": null
+      }
+    ],
+    "changedAt": "2026-07-20T14:05:00Z",
+    "changeReason": "CUSTOMER_REQUEST"
+  }
+}

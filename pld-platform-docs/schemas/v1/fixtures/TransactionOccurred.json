@@ -1,0 +1,37 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V4B",
+  "eventType": "TransactionOccurred",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-20T15:29:58Z",
+  "publishedAt": "2026-07-20T15:29:59Z",
+  "producer": "external",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "payments-ledger"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "sourceSystem": "payments-ledger",
+    "transactionId": "txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H",
+    "externalAccountRef": "acc-brl-99231",
+    "type": "PIX",
+    "amount": {
+      "value": "15000.00",
+      "currency": "BRL"
+    },
+    "occurredAt": "2026-07-20T15:29:58Z",
+    "counterparty": {
+      "name": "Empresa Exemplo LTDA",
+      "identifiers": [
+        {
+          "type": "CNPJ",
+          "value": "00000000000000",
+          "country": "BR"
+        }
+      ],
+      "country": "BR"
+    },
+    "channel": "APP"
+  }
+}
