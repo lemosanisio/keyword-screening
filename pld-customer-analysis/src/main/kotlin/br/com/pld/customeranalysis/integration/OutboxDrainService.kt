@@ -1,5 +1,6 @@
 package br.com.pld.customeranalysis.integration
 
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -11,6 +12,7 @@ import java.time.Instant
 class OutboxDrainService(
     private val jdbcTemplate: JdbcTemplate,
     private val publisherProvider: ObjectProvider<OutboxPublisher>,
+    private val meterRegistry: MeterRegistry,
 ) {
     @Transactional
     fun publishPending(limit: Int): Int {
@@ -20,6 +22,7 @@ class OutboxDrainService(
         messages.forEach { message ->
             publisher.publish(message)
             markProcessed(message.id, Instant.now())
+            meterRegistry.counter("pld.outbox.published", "eventType", message.eventType).increment()
         }
 
         return messages.size

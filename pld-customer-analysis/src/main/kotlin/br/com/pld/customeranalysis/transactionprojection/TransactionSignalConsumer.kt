@@ -11,6 +11,7 @@ import br.com.pld.customeranalysis.timeline.TimelineEntryJpaRepository
 import br.com.pld.customeranalysis.timeline.VisibilityClassification
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Instant
@@ -21,6 +22,7 @@ class TransactionSignalConsumer(
     private val partyRepository: PartyJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val objectMapper: ObjectMapper,
+    private val meterRegistry: MeterRegistry,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     fun consume(eventJson: String): InboxProcessingResult {
@@ -63,6 +65,7 @@ class TransactionSignalConsumer(
                 visibilityClassification = VisibilityClassification.CONFIDENTIAL,
             ),
         )
+        meterRegistry.counter("pld.transaction.signals.consumed", "severity", event.severity).increment()
     }
 
     private fun JsonNode.toTransactionSignalEvent(): TransactionSignalEvent {
