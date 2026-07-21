@@ -1,0 +1,48 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0W7A",
+  "eventType": "CustomerRiskProfileUpdated",
+  "eventVersion": 1,
+  "occurredAt": "2026-07-21T09:25:00Z",
+  "publishedAt": "2026-07-21T09:25:01Z",
+  "producer": "pld-customer-analysis",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V8A",
+  "actor": {
+    "type": "SYSTEM",
+    "id": "risk-assessment"
+  },
+  "subject": {
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "accountId": "acc_01J6ZK7Q3W8K0M2N4P6R8T0V2E",
+    "analysisCycleId": "acy_01J6ZK7Q3W8K0M2N4P6R8T0V7B",
+    "caseId": "cse_01J6ZK7Q3W8K0M2N4P6R8T0V8B"
+  },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "riskProfileId": "rsk_01J6ZK7Q3W8K0M2N4P6R8T0W7B",
+    "profileVersion": 7,
+    "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D",
+    "effectiveFrom": "2026-07-21T09:25:00Z",
+    "validUntil": "2027-01-21T09:25:00Z",
+    "riskLevel": "HIGH",
+    "segments": [
+      "PEP_RELATED",
+      "CROSS_BORDER"
+    ],
+    "transactionFacts": {
+      "expectedMonthlyIncome": {
+        "value": "15000.00",
+        "currency": "BRL",
+        "quality": "PRESENT"
+      },
+      "expectedCountries": {
+        "value": ["BR", "PY"],
+        "quality": "PRESENT"
+      }
+    },
+    "policyVersion": "customer-risk-12",
+    "assessmentId": "asm_01J6ZK7Q3W8K0M2N4P6R8T0W7C",
+    "reasonCodes": ["POLICY_REQUIRES_REVIEW"],
+    "expiresBecause": "PERIODIC_REVIEW_DUE"
+  }
+}

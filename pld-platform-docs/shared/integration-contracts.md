@@ -86,18 +86,24 @@ Payload mínimo:
 {
   "riskProfileId": "rsk_...",
   "profileVersion": 7,
+  "partyId": "pty_...",
   "effectiveFrom": "2026-07-20T15:00:00Z",
+  "validUntil": "2027-01-20T15:00:00Z",
   "riskLevel": "HIGH",
   "segments": ["PEP_RELATED", "CROSS_BORDER"],
   "transactionFacts": {
     "expectedMonthlyIncome": {"value": "15000.00", "currency": "BRL", "quality": "PRESENT"},
-    "expectedCountries": ["BR"]
+    "expectedCountries": {"value": ["BR"], "quality": "PRESENT"}
   },
-  "policyVersion": "customer-risk-12"
+  "policyVersion": "customer-risk-12",
+  "assessmentId": "asm_...",
+  "reasonCodes": ["POLICY_REQUIRES_REVIEW"]
 }
 ```
 
-Somente fatos necessários a regras transacionais são publicados. Evidências completas, nomes, documentos e narrativas ficam no serviço de origem.
+`RiskProfile` é uma projeção versionada derivada de `Assessment`, não uma decisão independente. Publicar somente quando houver mudança material consumível pelo motor transacional (`riskLevel`, `segments`, `transactionFacts`, política ou validade). Não publicar perfil novo quando o assessment estiver inconclusivo, em pendência técnica ou aguardando aprovação obrigatória.
+
+Somente fatos necessários a regras transacionais são publicados. Evidências completas, nomes, documentos, narrativas e explicação completa ficam no serviço de origem, rastreáveis por `assessmentId`.
 
 ### Outros eventos
 

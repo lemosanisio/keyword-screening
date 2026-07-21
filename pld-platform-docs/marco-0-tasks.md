@@ -10,9 +10,9 @@ Local: `pld-platform-docs/schemas/v1/`. JSON Schema draft 2020-12 (ADR-005). Cad
 
 - [x] M0.1.1 `common/envelope.schema.json` + tipos compartilhados (`actor`, `subject`, `dataClassification`; `money`/`factValue` entram quando um evento precisar — YAGNI)
 - [x] M0.1.2 Eventos de entrada (produtor: sistemas mestres): `CustomerOnboardingStarted`, `CustomerDataChanged`, `PartyRelationshipChanged`, `AccountStatusChanged`, `TransactionOccurred` — schemas são proposta de contrato ao sistema mestre (EXT-2)
-- [ ] M0.1.3 Eventos de `pld-customer-analysis`: `CustomerRiskProfileUpdated` (bloqueado por INT-1), `AnalysisCycleStatusChanged` ✔, `CaseStatusChanged` ✔, `AccountDecisionIssued` ✔, `SuspicionDecisionIssued` ✔, `CoafCommunicationStatusChanged` ✔
+- [x] M0.1.3 Eventos de `pld-customer-analysis`: `CustomerRiskProfileUpdated`, `AnalysisCycleStatusChanged`, `CaseStatusChanged`, `AccountDecisionIssued`, `SuspicionDecisionIssued`, `CoafCommunicationStatusChanged`
 - [x] M0.1.4 Eventos de `pld-transaction-screening`: `TransactionEvaluationCompleted`, `TransactionSignalDetected`, `ManualReviewRequested`, `TransactionDecisionExecutionCompleted`, `RuleConfigurationActivated`
-- [ ] M0.1.5 Fixture dourada por evento em `fixtures/` (15/16 — falta só `CustomerRiskProfileUpdated`, bloqueado por INT-1) — sem PII, `dataClassification` preenchida, IDs no padrão ADR-005
+- [x] M0.1.5 Fixture dourada por evento em `fixtures/` (16/16) — sem PII, `dataClassification` preenchida, IDs no padrão ADR-005
 
 ## M0.2 — Convenções normativas restantes
 
@@ -33,7 +33,7 @@ Primeiro código do Marco 0. TDD: teste primeiro, sempre.
 
 ## Definition of Done do Marco 0
 
-- [ ] 16 eventos + envelope com schema e fixture válidos
-- [ ] Harness de validação verde em CI local (`./gradlew test`)
-- [ ] Mapa de compatibilidade revisado e commitado
-- [ ] Nenhuma mudança de comportamento em produção
+- [x] 16 eventos + envelope com schema e fixture válidos
+- [x] Harness de validação verde em CI local (`./gradlew test`)
+- [x] Mapa de compatibilidade revisado e commitado
+- [x] Nenhuma mudança de comportamento em produção

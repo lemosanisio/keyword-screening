@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CustomerRiskProfileUpdated.v1",
+  "description": "Projeção versionada de risco do cliente publicada por pld-customer-analysis para o motor transacional. Deriva de Assessment e transporta somente fatos necessários às regras transacionais; evidências, narrativas e explicação completa ficam no serviço de origem.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "CustomerRiskProfileUpdated" },
+        "eventVersion": { "const": 1 },
+        "producer": { "const": "pld-customer-analysis" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "riskProfileId",
+            "profileVersion",
+            "partyId",
+            "effectiveFrom",
+            "riskLevel",
+            "segments",
+            "transactionFacts",
+            "policyVersion",
+            "assessmentId"
+          ],
+          "properties": {
+            "riskProfileId": {
+              "type": "string",
+              "pattern": "^rsk_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "profileVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Versão monotônica; consumidor aplica somente se incoming > current."
+            },
+            "partyId": {
+              "type": "string",
+              "pattern": "^pty_[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "Chave da projeção local no pld-transaction-screening."
+            },
+            "effectiveFrom": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "validUntil": {
+              "type": ["string", "null"],
+              "format": "date-time"
+            },
+            "riskLevel": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Vocabulário aberto de Compliance (ex.: LOW, MEDIUM, HIGH, VERY_HIGH)."
+            },
+            "segments": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Códigos de política consumíveis por regras transacionais. Consumidor ignora desconhecidos."
+            },
+            "transactionFacts": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "Mapa de fatos mínimos necessários ao motor transacional. Nunca carrega evidência completa, nome, documento ou narrativa.",
+              "additionalProperties": {
+                "type": "object",
+                "required": ["value", "quality"],
+                "properties": {
+                  "value": {
+                    "description": "Valor do fato; tipo livre por fato (string, número, boolean, array ou objeto)."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "description": "Moeda ISO 4217 quando o valor for monetário."
+                  },
+                  "quality": {
+                    "enum": ["PRESENT", "UNKNOWN", "STALE", "ERROR"],
+                    "description": "Vocabulário fechado de qualidade de fato (glossário)."
+                  }
+                }
+              }
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "assessmentId": {
+              "type": "string",
+              "pattern": "^asm_[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "Referência para auditoria completa no serviço de origem."
+            },
+            "reasonCodes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "INSUFFICIENT_EVIDENCE",
+                  "CONFLICTING_EVIDENCE",
+                  "LOW_IDENTITY_CONFIDENCE",
+                  "SOURCE_UNAVAILABLE",
+                  "STALE_EVIDENCE",
+                  "POLICY_REQUIRES_REVIEW",
+                  "HIGH_IMPACT_ACTION",
+                  "UNCLASSIFIED_SITUATION"
+                ]
+              },
+              "description": "Resumo estruturado; narrativa sensível fica no serviço de origem."
+            },
+            "expiresBecause": {
+              "type": "string",
+              "description": "Motivo operacional da expiração prevista; vocabulário aberto."
+            }
+          }
+        }
+      }
+    }
+  ]
+}
