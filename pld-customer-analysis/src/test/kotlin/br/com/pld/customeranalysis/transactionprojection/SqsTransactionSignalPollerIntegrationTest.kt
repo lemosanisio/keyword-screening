@@ -50,7 +50,7 @@ class SqsTransactionSignalPollerIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
         purgeQueue()
     }
@@ -70,6 +70,7 @@ class SqsTransactionSignalPollerIntegrationTest {
         assertThat(timelineEntryTypes(partyId)).containsExactly(
             "PARTY_CREATED",
             "TRANSACTION_SIGNAL_DETECTED",
+            "CASE_CREATED",
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
         assertThat(visibleMessageCount()).isEqualTo(0)
@@ -88,6 +89,7 @@ class SqsTransactionSignalPollerIntegrationTest {
         assertThat(timelineEntryTypes(partyId)).containsExactly(
             "PARTY_CREATED",
             "TRANSACTION_SIGNAL_DETECTED",
+            "CASE_CREATED",
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
         assertThat(visibleMessageCount()).isEqualTo(0)

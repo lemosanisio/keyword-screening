@@ -1,5 +1,7 @@
 package br.com.pld.customeranalysis.transactionprojection
 
+import br.com.pld.customeranalysis.casemanagement.CaseService
+import br.com.pld.customeranalysis.casemanagement.RecordTransactionSignalCaseCommand
 import br.com.pld.customeranalysis.common.PrefixedUlid
 import br.com.pld.customeranalysis.integration.InboxMessage
 import br.com.pld.customeranalysis.integration.InboxProcessingResult
@@ -21,6 +23,7 @@ class TransactionSignalConsumer(
     private val inboxService: InboxService,
     private val partyRepository: PartyJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
+    private val caseService: CaseService,
     private val objectMapper: ObjectMapper,
     private val meterRegistry: MeterRegistry,
     private val clock: Clock = Clock.systemUTC(),
@@ -66,6 +69,22 @@ class TransactionSignalConsumer(
             ),
         )
         meterRegistry.counter("pld.transaction.signals.consumed", "severity", event.severity).increment()
+
+        if (event.recommendedRoute == "DERIVED_TO_ANALYST" || event.recommendedRoute == "MANDATORY_SECOND_APPROVAL") {
+            caseService.recordTransactionSignal(
+                RecordTransactionSignalCaseCommand(
+                    partyId = event.partyId,
+                    signalId = event.signalId,
+                    eventId = event.eventId,
+                    sourceSystem = "pld-transaction-screening",
+                    severity = event.severity,
+                    recommendedRoute = event.recommendedRoute,
+                    reasonCode = "TRANSACTION_SIGNAL_${event.severity}",
+                    occurredAt = event.occurredAt,
+                    correlationId = event.correlationId,
+                ),
+            )
+        }
     }
 
     private fun JsonNode.toTransactionSignalEvent(): TransactionSignalEvent {
@@ -91,6 +110,7 @@ class TransactionSignalConsumer(
             analysisCycleId = subject.optionalText("analysisCycleId"),
             signalId = payload.requiredText("signalId"),
             severity = payload.requiredText("severity"),
+            recommendedRoute = payload.optionalText("recommendedRoute"),
             riskProfileVersion = payload.optionalInt("riskProfileVersion"),
         )
     }
@@ -140,5 +160,6 @@ private data class TransactionSignalEvent(
     val analysisCycleId: String?,
     val signalId: String,
     val severity: String,
+    val recommendedRoute: String?,
     val riskProfileVersion: Int?,
 )

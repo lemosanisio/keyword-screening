@@ -34,7 +34,7 @@ class TransactionSignalConsumerIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -59,9 +59,15 @@ class TransactionSignalConsumerIntegrationTest {
         assertThat(timelineEntries(partyId)).containsExactly(
             TimelineRow("PARTY_CREATED", "Party", partyId),
             TimelineRow("TRANSACTION_SIGNAL_DETECTED", "TransactionSignal", "sig_01J6ZK7Q3W8K0M2N4P6R8T0V2F"),
+            TimelineRow("CASE_CREATED", "Case", caseId()),
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
     }
+
+    private fun caseId(): String = jdbcTemplate.queryForObject(
+        "select id from pld_case",
+        String::class.java,
+    ) ?: error("case not found")
 
     private fun timelineEntries(partyId: String): List<TimelineRow> = jdbcTemplate.query(
         "select entry_type, object_type, object_id from timeline_entry where party_id = ? order by recorded_at, id",
