@@ -31,6 +31,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("software.amazon.awssdk:sqs")
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
@@ -41,6 +42,7 @@ dependencies {
     }
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:localstack")
     testImplementation("org.testcontainers:postgresql")
 }
 
@@ -48,6 +50,7 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.modulith:spring-modulith-bom:1.2.5")
         mavenBom("org.testcontainers:testcontainers-bom:1.20.3")
+        mavenBom("software.amazon.awssdk:bom:2.27.21")
     }
 }
 

@@ -24,3 +24,13 @@ management:
     health:
       probes:
         enabled: true
+
+pld:
+  integration:
+    sqs:
+      enabled: ${PLD_INTEGRATION_SQS_ENABLED:false}
+      region: ${PLD_INTEGRATION_SQS_REGION:us-east-1}
+      endpoint: ${PLD_INTEGRATION_SQS_ENDPOINT:}
+      access-key-id: ${PLD_INTEGRATION_SQS_ACCESS_KEY_ID:test}
+      secret-access-key: ${PLD_INTEGRATION_SQS_SECRET_ACCESS_KEY:test}
+      outbox-queue-url: ${PLD_INTEGRATION_SQS_OUTBOX_QUEUE_URL:}

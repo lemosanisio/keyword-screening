@@ -33,6 +33,17 @@ services:
       timeout: 5s
       retries: 5
 
+  localstack:
+    image: localstack/localstack:3.8.1
+    container_name: pld-localstack
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+
 #  app:
 #    build:
 #      context: pld-transaction-screening
@@ -52,3 +63,4 @@ services:
 volumes:
   postgres_data:
   customer_analysis_postgres_data:
+  localstack_data:
