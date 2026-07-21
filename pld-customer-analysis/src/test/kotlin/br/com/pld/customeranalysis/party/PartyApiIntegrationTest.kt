@@ -25,8 +25,75 @@ class PartyApiIntegrationTest {
 
     @Test
     fun `creates party with snapshot and timeline entry`() {
+        val partyId = createParty(correlationId = "corr-party-create-1")
+
+        mockMvc.get("/v1/parties/{partyId}", partyId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.partyId") { value(partyId) }
+                jsonPath("$.partyType") { value("PERSON") }
+                jsonPath("$.currentSnapshot.snapshotVersion") { value(1) }
+            }
+
+        mockMvc.get("/v1/parties/{partyId}/timeline", partyId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.entries", hasSize<Any>(1))
+                jsonPath("$.entries[0].entryType") { value("PARTY_CREATED") }
+                jsonPath("$.entries[0].summaryCode") { value("PARTY_CREATED") }
+                jsonPath("$.entries[0].objectType") { value("Party") }
+                jsonPath("$.entries[0].objectId") { value(partyId) }
+                jsonPath("$.entries[0].correlationId") { value("corr-party-create-1") }
+            }
+    }
+
+    @Test
+    fun `opens analysis cycle and appends timeline entry`() {
+        val partyId = createParty(correlationId = "corr-analysis-cycle-party")
+
+        val cycleResponse = mockMvc.post("/v1/parties/{partyId}/analysis-cycles", partyId) {
+            header("X-Correlation-Id", "corr-analysis-cycle-create-1")
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "ANALYST")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "cycleType": "ONBOARDING",
+                  "policyVersion": "customer-risk-12"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isCreated() }
+                jsonPath("$.analysisCycleId", startsWith("acy_"))
+                jsonPath("$.partyId") { value(partyId) }
+                jsonPath("$.cycleType") { value("ONBOARDING") }
+                jsonPath("$.status") { value("CREATED") }
+                jsonPath("$.policyVersion") { value("customer-risk-12") }
+            }
+            .andReturn()
+
+        val cycleId = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+            .readTree(cycleResponse.response.contentAsString)
+            .get("analysisCycleId")
+            .asText()
+
+        mockMvc.get("/v1/parties/{partyId}/timeline", partyId)
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.entries", hasSize<Any>(2))
+                jsonPath("$.entries[1].entryType") { value("ANALYSIS_CYCLE_CREATED") }
+                jsonPath("$.entries[1].summaryCode") { value("ANALYSIS_CYCLE_CREATED") }
+                jsonPath("$.entries[1].objectType") { value("AnalysisCycle") }
+                jsonPath("$.entries[1].objectId") { value(cycleId) }
+                jsonPath("$.entries[1].analysisCycleId") { value(cycleId) }
+                jsonPath("$.entries[1].correlationId") { value("corr-analysis-cycle-create-1") }
+            }
+    }
+
+    private fun createParty(correlationId: String): String {
         val createResponse = mockMvc.post("/v1/parties") {
-            header("X-Correlation-Id", "corr-party-create-1")
+            header("X-Correlation-Id", correlationId)
             header("X-Actor-Id", "analyst-1")
             header("X-Actor-Role", "ANALYST")
             contentType = org.springframework.http.MediaType.APPLICATION_JSON
@@ -49,29 +116,10 @@ class PartyApiIntegrationTest {
             }
             .andReturn()
 
-        val partyId = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        return com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
             .readTree(createResponse.response.contentAsString)
             .get("partyId")
             .asText()
-
-        mockMvc.get("/v1/parties/{partyId}", partyId)
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.partyId") { value(partyId) }
-                jsonPath("$.partyType") { value("PERSON") }
-                jsonPath("$.currentSnapshot.snapshotVersion") { value(1) }
-            }
-
-        mockMvc.get("/v1/parties/{partyId}/timeline", partyId)
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.entries", hasSize<Any>(1))
-                jsonPath("$.entries[0].entryType") { value("PARTY_CREATED") }
-                jsonPath("$.entries[0].summaryCode") { value("PARTY_CREATED") }
-                jsonPath("$.entries[0].objectType") { value("Party") }
-                jsonPath("$.entries[0].objectId") { value(partyId) }
-                jsonPath("$.entries[0].correlationId") { value("corr-party-create-1") }
-            }
     }
 
     companion object {

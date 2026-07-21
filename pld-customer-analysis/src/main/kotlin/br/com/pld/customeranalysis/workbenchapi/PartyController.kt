@@ -6,6 +6,10 @@ import br.com.pld.customeranalysis.party.PartyService
 import br.com.pld.customeranalysis.party.PartySnapshotView
 import br.com.pld.customeranalysis.party.PartyType
 import br.com.pld.customeranalysis.party.PartyView
+import br.com.pld.customeranalysis.analysis.AnalysisCycleService
+import br.com.pld.customeranalysis.analysis.AnalysisCycleType
+import br.com.pld.customeranalysis.analysis.AnalysisCycleView
+import br.com.pld.customeranalysis.analysis.OpenAnalysisCycleCommand
 import br.com.pld.customeranalysis.timeline.TimelineService
 import br.com.pld.customeranalysis.timeline.TimelineView
 import jakarta.validation.Valid
@@ -27,6 +31,7 @@ import java.time.Instant
 @RequestMapping("/v1/parties")
 class PartyController(
     private val partyService: PartyService,
+    private val analysisCycleService: AnalysisCycleService,
     private val timelineService: TimelineService,
     private val actorResolver: ActorResolver,
 ) {
@@ -54,6 +59,29 @@ class PartyController(
 
     @GetMapping("/{partyId}")
     fun get(@PathVariable partyId: String): PartyResponse = PartyResponse.from(partyService.get(partyId))
+
+    @PostMapping("/{partyId}/analysis-cycles")
+    fun openAnalysisCycle(
+        @PathVariable partyId: String,
+        @Valid @RequestBody request: OpenAnalysisCycleRequest,
+        @RequestHeader("X-Actor-Id", required = false) actorId: String?,
+        @RequestHeader("X-Actor-Role", required = false) actorRole: String?,
+        @RequestHeader("X-Correlation-Id", required = false) correlationId: String?,
+    ): ResponseEntity<AnalysisCycleResponse> {
+        val cycle = analysisCycleService.open(
+            OpenAnalysisCycleCommand(
+                partyId = partyId,
+                cycleType = request.cycleType,
+                policyVersion = request.policyVersion,
+                actor = actorResolver.actor(actorId, actorRole),
+                correlationId = actorResolver.correlationId(correlationId),
+            ),
+        )
+
+        return ResponseEntity
+            .created(URI.create("/v1/parties/$partyId/analysis-cycles/${cycle.analysisCycleId}"))
+            .body(AnalysisCycleResponse.from(cycle))
+    }
 
     @GetMapping("/{partyId}/timeline")
     fun timeline(@PathVariable partyId: String): TimelineView = timelineService.getByPartyId(partyId)
@@ -98,6 +126,32 @@ data class PartySnapshotResponse(
             officialName = view.officialName,
             sourceSystem = view.sourceSystem,
             effectiveAt = view.effectiveAt,
+        )
+    }
+}
+
+data class OpenAnalysisCycleRequest(
+    val cycleType: AnalysisCycleType,
+    @field:NotBlank
+    val policyVersion: String,
+)
+
+data class AnalysisCycleResponse(
+    val analysisCycleId: String,
+    val partyId: String,
+    val cycleType: AnalysisCycleType,
+    val status: String,
+    val policyVersion: String,
+    val createdAt: Instant,
+) {
+    companion object {
+        fun from(view: AnalysisCycleView) = AnalysisCycleResponse(
+            analysisCycleId = view.analysisCycleId,
+            partyId = view.partyId,
+            cycleType = view.cycleType,
+            status = view.status.name,
+            policyVersion = view.policyVersion,
+            createdAt = view.createdAt,
         )
     }
 }
