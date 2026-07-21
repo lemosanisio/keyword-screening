@@ -47,7 +47,7 @@ class PartyController(
                 partyType = request.partyType,
                 officialName = request.officialName,
                 sourceSystem = request.sourceSystem,
-                actor = actorResolver.actor(actorId, actorRole),
+                actor = actorResolver.commandActor(actorId, actorRole),
                 correlationId = actorResolver.correlationId(correlationId),
             ),
         )
@@ -73,7 +73,7 @@ class PartyController(
                 partyId = partyId,
                 cycleType = request.cycleType,
                 policyVersion = request.policyVersion,
-                actor = actorResolver.actor(actorId, actorRole),
+                actor = actorResolver.commandActor(actorId, actorRole),
                 correlationId = actorResolver.correlationId(correlationId),
             ),
         )

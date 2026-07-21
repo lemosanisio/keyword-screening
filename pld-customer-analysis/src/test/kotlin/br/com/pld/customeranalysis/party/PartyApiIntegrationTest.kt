@@ -109,6 +109,44 @@ class PartyApiIntegrationTest {
             .containsExactly("PartyCreated", "AnalysisCycleCreated")
     }
 
+    @Test
+    fun `rejects write command without actor headers`() {
+        mockMvc.post("/v1/parties") {
+            header("X-Correlation-Id", "corr-missing-actor")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "partyType": "PERSON",
+                  "officialName": "Maria Exemplo da Silva",
+                  "sourceSystem": "manual"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+    }
+
+    @Test
+    fun `rejects write command with invalid actor role`() {
+        mockMvc.post("/v1/parties") {
+            header("X-Correlation-Id", "corr-invalid-actor-role")
+            header("X-Actor-Id", "analyst-1")
+            header("X-Actor-Role", "UNKNOWN")
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "partyType": "PERSON",
+                  "officialName": "Maria Exemplo da Silva",
+                  "sourceSystem": "manual"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+    }
+
     private fun outboxEventTypes(): List<String> = jdbcTemplate.queryForList(
         "select event_type from outbox_event order by occurred_at, id",
         String::class.java,

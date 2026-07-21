@@ -14,14 +14,14 @@ Escopo: fundação vertical de `pld-customer-analysis`, conforme ADR-008.
 - [x] Publicação transacional em outbox para `PartyCreated` e `AnalysisCycleCreated`.
 - [x] Inbox idempotente por `(consumerName, eventId)`.
 - [x] Dreno básico da outbox com porta `OutboxPublisher` e marcação de eventos publicados.
+- [x] Adapter SQS/LocalStack para `OutboxPublisher`.
+- [x] Scheduler/configuração para drenar a outbox fora do caminho síncrono da API.
 - [x] Testes de integração com PostgreSQL/Testcontainers cobrindo Party, AnalysisCycle, timeline, outbox e inbox.
+- [x] Segurança dev via headers (`X-Actor-Id`, `X-Actor-Role`, `X-Correlation-Id`) aplicada às APIs de escrita.
 
 ## Próximo corte
 
-- [ ] Adapter SQS/LocalStack para `OutboxPublisher`.
-- [ ] Scheduler/configuração para drenar a outbox fora do caminho síncrono da API.
 - [ ] Health/OpenAPI/métricas mínimos do novo backend.
-- [ ] Segurança dev via headers/JWT stub (`X-Actor-Id`, `X-Actor-Role`, `X-Correlation-Id`) aplicada às APIs.
 - [ ] Primeiro consumidor de evento externo usando `InboxService`.
 
 ## Fora do Marco 1
