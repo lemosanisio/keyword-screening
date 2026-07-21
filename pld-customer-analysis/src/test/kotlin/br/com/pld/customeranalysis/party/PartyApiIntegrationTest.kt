@@ -2,10 +2,12 @@ package br.com.pld.customeranalysis.party
 
 import org.hamcrest.Matchers.hasSize
 import org.hamcrest.Matchers.startsWith
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -22,6 +24,16 @@ class PartyApiIntegrationTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @BeforeEach
+    fun cleanDatabase() {
+        jdbcTemplate.execute(
+            "truncate table inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+        )
+    }
 
     @Test
     fun `creates party with snapshot and timeline entry`() {
@@ -45,6 +57,9 @@ class PartyApiIntegrationTest {
                 jsonPath("$.entries[0].objectId") { value(partyId) }
                 jsonPath("$.entries[0].correlationId") { value("corr-party-create-1") }
             }
+
+        org.assertj.core.api.Assertions.assertThat(outboxEventTypes())
+            .containsExactly("PartyCreated")
     }
 
     @Test
@@ -89,7 +104,15 @@ class PartyApiIntegrationTest {
                 jsonPath("$.entries[1].analysisCycleId") { value(cycleId) }
                 jsonPath("$.entries[1].correlationId") { value("corr-analysis-cycle-create-1") }
             }
+
+        org.assertj.core.api.Assertions.assertThat(outboxEventTypes())
+            .containsExactly("PartyCreated", "AnalysisCycleCreated")
     }
+
+    private fun outboxEventTypes(): List<String> = jdbcTemplate.queryForList(
+        "select event_type from outbox_event order by occurred_at, id",
+        String::class.java,
+    )
 
     private fun createParty(correlationId: String): String {
         val createResponse = mockMvc.post("/v1/parties") {

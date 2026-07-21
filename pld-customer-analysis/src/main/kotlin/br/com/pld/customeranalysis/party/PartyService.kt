@@ -2,6 +2,7 @@ package br.com.pld.customeranalysis.party
 
 import br.com.pld.customeranalysis.common.PrefixedUlid
 import br.com.pld.customeranalysis.identityaccess.Actor
+import br.com.pld.customeranalysis.integration.OutboxService
 import br.com.pld.customeranalysis.timeline.TimelineEntryEntity
 import br.com.pld.customeranalysis.timeline.TimelineEntryJpaRepository
 import br.com.pld.customeranalysis.timeline.VisibilityClassification
@@ -15,6 +16,7 @@ class PartyService(
     private val partyRepository: PartyJpaRepository,
     private val snapshotRepository: PartySnapshotJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
+    private val outboxService: OutboxService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
 
@@ -60,6 +62,19 @@ class PartyService(
                 objectVersion = "1",
                 correlationId = command.correlationId,
                 visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        outboxService.append(
+            eventType = "PartyCreated",
+            aggregateType = "Party",
+            aggregateId = partyId,
+            payload = mapOf(
+                "partyId" to partyId,
+                "partyType" to command.partyType.name,
+                "snapshotId" to snapshot.id,
+                "snapshotVersion" to snapshot.snapshotVersion,
+                "correlationId" to command.correlationId,
             ),
         )
 

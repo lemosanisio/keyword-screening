@@ -2,6 +2,7 @@ package br.com.pld.customeranalysis.analysis
 
 import br.com.pld.customeranalysis.common.PrefixedUlid
 import br.com.pld.customeranalysis.identityaccess.Actor
+import br.com.pld.customeranalysis.integration.OutboxService
 import br.com.pld.customeranalysis.party.PartyJpaRepository
 import br.com.pld.customeranalysis.party.PartyNotFoundException
 import br.com.pld.customeranalysis.timeline.TimelineEntryEntity
@@ -17,6 +18,7 @@ class AnalysisCycleService(
     private val partyRepository: PartyJpaRepository,
     private val analysisCycleRepository: AnalysisCycleJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
+    private val outboxService: OutboxService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
@@ -54,6 +56,20 @@ class AnalysisCycleService(
                 objectVersion = "1",
                 correlationId = command.correlationId,
                 visibilityClassification = VisibilityClassification.CONFIDENTIAL,
+            ),
+        )
+
+        outboxService.append(
+            eventType = "AnalysisCycleCreated",
+            aggregateType = "AnalysisCycle",
+            aggregateId = cycle.id,
+            payload = mapOf(
+                "analysisCycleId" to cycle.id,
+                "partyId" to command.partyId,
+                "cycleType" to command.cycleType.name,
+                "status" to cycle.status.name,
+                "policyVersion" to command.policyVersion,
+                "correlationId" to command.correlationId,
             ),
         )
 
