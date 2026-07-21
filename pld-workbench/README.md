@@ -7,9 +7,10 @@ Este projeto usa React, TypeScript, Bun, Tailwind e componentes no estilo shadcn
 ## Scripts
 
 ```bash
-bun install
-bun run build
-bun run dev
+mise install bun
+mise exec -- bun install
+mise exec -- bun run build
+mise exec -- bun run dev
 ```
 
-O ambiente atual precisa ter Bun instalado. O backend esperado é o `pld-customer-analysis` em `http://localhost:8080`. Para apontar para outro backend, ajuste `globalThis.PLD_API_BASE_URL` em `index.html` neste protótipo.
+O backend esperado é o `pld-customer-analysis` em `http://localhost:8080`. Para apontar para outro backend, ajuste `globalThis.PLD_API_BASE_URL` em `index.html` neste protótipo.

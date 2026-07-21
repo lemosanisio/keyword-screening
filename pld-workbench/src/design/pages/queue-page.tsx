@@ -20,6 +20,9 @@ export function QueuePage() {
   if (query.isError) {
     return <Alert variant="destructive">Não foi possível carregar a fila. Verifique se o backend está rodando.</Alert>;
   }
+  if (!query.data) {
+    return <Alert variant="destructive">A fila não retornou dados.</Alert>;
+  }
 
   return (
     <div className="space-y-3">

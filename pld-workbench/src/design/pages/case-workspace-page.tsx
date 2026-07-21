@@ -57,6 +57,9 @@ export function CaseWorkspacePage() {
   if (query.isError) {
     return <Alert variant="destructive">Não foi possível carregar o caso.</Alert>;
   }
+  if (!query.data) {
+    return <Alert variant="destructive">O caso não retornou dados.</Alert>;
+  }
 
   const detail = query.data;
   const version = detail.case.version;

@@ -44,7 +44,7 @@ O marco deve validar a jornada completa do analista sobre o backend `pld-custome
 - [x] Tratar conflito de versão `409` sem sobrescrever estado.
 - [x] Rodar build/verificações possíveis.
 
-Observação: backend validado com Gradle. O ambiente local desta sessão não possui Bun instalado, então `bun install`/`bun run build` deve ser executado em máquina com Bun disponível.
+Observação: backend validado com Gradle. Frontend validado com Bun instalado via `mise`.
 
 ## Critérios de aceite
 
@@ -55,7 +55,7 @@ Observação: backend validado com Gradle. O ambiente local desta sessão não p
 - [ ] O usuário registra decisão sensível e vê pendência de aprovação.
 - [ ] O usuário troca para ator aprovador e aprova a decisão.
 - [ ] Timeline, decisões e status refletem o fluxo.
-- [ ] `bun run build` passa em ambiente com Bun instalado.
+- [x] `bun run build` passa com Bun instalado via `mise`.
 
 ## Fora deste marco
 
