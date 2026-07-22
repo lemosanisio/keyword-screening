@@ -201,10 +201,14 @@ class DecisionService(
         publishDecisionMade(command, ruleDefinition.id, ruleDefinition.code, decisionResult, savedExecution, traceId, evaluation)
 
         logger.info(
-            "Decisão executada: transactionId={}, ruleCode={}, decision={}, traceId={}",
+            "Decisão executada: transactionId={}, ruleCode={}, decision={}, outcome={}, review={}, status={}, purpose={}, traceId={}",
             command.transactionId.value,
             command.ruleCode.value,
             decisionResult.decision,
+            decisionResult.evaluationOutcome,
+            decisionResult.reviewRequired,
+            decisionResult.evaluationStatus,
+            command.purpose,
             traceId.value
         )
 

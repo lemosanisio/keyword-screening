@@ -135,7 +135,18 @@ class ContextBuilder(
             facts = allFacts,
             factResults = factResults.values.toList(),
             resolverResults = allResults
-        )
+        ).also { factSet ->
+            val byQuality = factSet.factResults.groupBy { it.quality }.mapValues { it.value.size }
+            logger.info(
+                "ContextBuilder facts resolved: total={}, PRESENT={}, UNKNOWN={}, STALE={}, ERROR={}, transactionId={}",
+                factSet.factResults.size,
+                byQuality[FactQuality.PRESENT] ?: 0,
+                byQuality[FactQuality.UNKNOWN] ?: 0,
+                byQuality[FactQuality.STALE] ?: 0,
+                byQuality[FactQuality.ERROR] ?: 0,
+                event.transactionId.value,
+            )
+        }
     }
 }
 

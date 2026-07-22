@@ -47,6 +47,14 @@ O próximo incremento precisa tornar cada avaliação uma unidade imutável, exp
 
 `TransactionEvaluationCompleted.v2` representa um único evento lógico com `eventId` estável. A entrega física pode ocorrer mais de uma vez e consumidores devem deduplicá-la.
 
+## Runbook de replay sem efeitos operacionais
+
+1. Emitir `DetectionEvent` com `purpose=REPLAY`, `evaluationRequestId` único e os mesmos `transactionId`, `transactionVersion`, `rulesetVersion` e snapshot da avaliação original.
+2. O `DecisionService` resolve a identidade LIVE e reconhece que já existe uma avaliação com a chave natural — retorna o resultado existente sem reexecutar regras nem persistir novos registros.
+3. Para forçar nova execução (ex.: novo ruleset), use novo `evaluationRequestId` com `purpose=REPLAY` — a unicidade por `(evaluationRequestId, purpose)` garante idempotência de retry.
+4. `REPLAY`, `BACKTEST`, `DRY_RUN` e `INVESTIGATION` não publicam eventos de integração nem criam efeitos operacionais por padrão; opt-in explícito pode ser configurado por `evaluationRequestId`.
+5. Verificar a integridade do resultado comparando `snapshotHash` e `evaluationOutcome` com a avaliação LIVE correspondente.
+
 ## Significado de reproduzível
 
 Neste marco, reproduzir significa reconstruir e consultar os fatos, versões, resultados e explicação usados na época, mesmo após alteração do catálogo. Não significa reexecutar byte a byte código antigo. Uma reexecução intencional cria outra avaliação com finalidade `REPLAY`.

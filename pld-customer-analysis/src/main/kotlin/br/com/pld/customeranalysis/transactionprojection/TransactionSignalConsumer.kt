@@ -138,6 +138,12 @@ class TransactionSignalConsumer(
                     properties.acceptedProducer,
                     objectMapper.writeValueAsString(listOf(event.signalId)),
                 )
+            } else if (inserted == 1) {
+                meterRegistry.counter(
+                    "pld.transaction.signals.unmatched",
+                    "signalType",
+                    event.signalType,
+                ).increment()
             }
         }
     }

@@ -85,6 +85,37 @@ class ManualReviewLiveIntegrationTest {
             .containsExactly("ManualReviewRequest", "TransactionSignal")
         assertThat(jdbcTemplate.queryForObject("select effect_status from manual_review_request", String::class.java))
             .isEqualTo("CASE_EFFECT_APPLIED")
+        assertThat(jdbcTemplate.queryForObject(
+            "select grouping_policy_version_applied from manual_review_request",
+            String::class.java,
+        )).isEqualTo("transaction-alert-grouping-1")
+    }
+
+    @Test
+    fun `replay with different grouping policy does not create a second case`() {
+        val partyId = createParty("Policy Change")
+        val event = fixture().replace("pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D", partyId)
+        consumer.consume(event)
+
+        jdbcTemplate.update(
+            "UPDATE manual_review_request SET grouping_policy_version_applied = 'transaction-alert-grouping-legacy'",
+        )
+        val originalGrouping = jdbcTemplate.queryForObject(
+            "select grouping_policy_version_applied from manual_review_request",
+            String::class.java,
+        )
+        assertThat(originalGrouping).isEqualTo("transaction-alert-grouping-legacy")
+
+        consumer.consume(event.replace(
+            "01J6ZK7Q3W8K0M2N4P6R8T0V6A",
+            "01J6ZK7Q3W8K0M2N4P6R8T0V7A",
+        ))
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from pld_case", Long::class.java)).isEqualTo(1)
+        assertThat(jdbcTemplate.queryForObject(
+            "select grouping_policy_version_applied from manual_review_request",
+            String::class.java,
+        )).isEqualTo("transaction-alert-grouping-legacy")
     }
 
     @Test

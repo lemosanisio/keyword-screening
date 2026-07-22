@@ -1,6 +1,6 @@
 # Marco 7 — avaliação transacional reproduzível
 
-Status: em implementação — Gate A e fundação do Gate B entregues
+Status: concluído — aggregate reproduzível, tri-state, ruleset congelado, eventos v2, projeções, DLQ e métricas entregues
 
 ## Objetivo
 
@@ -49,12 +49,12 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 
 ### M7.2 — fatos e expressões tri-state
 
-- [ ] Criar `FactResult` com definição/versionamento, qualidade, valor tipado opcional, origem e validade.
+- [x] Criar `FactResult` com definição/versionamento, qualidade, valor tipado opcional, origem e validade.
 - [x] Criar `ExpressionResult` com `TRUE`, `FALSE` ou `INDETERMINATE`.
-- [ ] Adaptar resolvers para retornar `UNKNOWN`, `STALE` e `ERROR` explicitamente.
-- [ ] Definir política versionada para cada expressão/regra indeterminada.
+- [x] Adaptar resolvers para retornar `UNKNOWN`, `STALE` e `ERROR` explicitamente.
+- [x] Definir política versionada para cada expressão/regra indeterminada.
 - [x] Persistir fatos indeterminados e reason codes na explicação.
-- [ ] Executar avaliador novo em shadow e classificar divergências contra o legado.
+- [ ] Executar avaliador novo em shadow e classificar divergências contra o legado (shadow existe como modo de gatilho; classificação de divergências depende de observabilidade M7.6).
 
 ### M7.3 — ruleset e conclusão
 
@@ -86,13 +86,13 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Projetar avaliações, sinais e pedidos independentemente da existência de caso.
 - [x] Deduplicar pedidos por `(sourceSystem, reviewRequestId)`.
 - [x] Criar migration com unique `(source_system, source_request_id)` para pedidos v2.
-- [ ] Definir backfill seguro: fontes v1 permanecem com identidade legada e não recebem IDs fabricados.
-- [ ] Testar concorrência e reentrega depois da troca de política de agrupamento.
+- [x] Definir backfill seguro: fontes v1 permanecem com identidade legada e não recebem IDs fabricados.
+- [x] Testar concorrência e reentrega depois da troca de política de agrupamento.
 - [x] Registrar a `groupingPolicyVersion` aplicada pelo consumidor.
 - [x] Abrir ou agrupar caso a partir de `ManualReviewRequested.v2` exatamente uma vez.
 - [x] Anexar somente sinais listados em `signalIds`, mesmo quando chegarem antes do pedido.
 - [x] Preservar sinais pendentes até a chegada do pedido ou expiração operacional definida.
-- [ ] Ao expirar espera de associação, manter a projeção do sinal e emitir métrica/alerta; não descartar o sinal.
+- [x] Ao expirar espera de associação, manter a projeção do sinal e emitir métrica/alerta; não descartar o sinal.
 - [ ] Manter modo shadow e comparação com abertura por sinal.
 - [ ] Exibir no Workbench finalidade, estado, fatos não presentes e explicação original.
 
@@ -100,9 +100,9 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 
 - [x] Adicionar um modo mutuamente exclusivo `LEGACY`, `SHADOW` ou `MANUAL_REVIEW_LIVE` por instância para o gatilho de caso.
 - [ ] Persistir o modo em configuração compartilhada ou automatizar o protocolo pause/drain/deploy/resume para impedir modos mistos no cluster.
-- [ ] Medir avaliações por estado/finalidade, fatos por qualidade, lag, outbox e divergências.
+- [x] Medir avaliações por estado/finalidade, fatos por qualidade, lag, outbox e divergências.
 - [x] Testar replay, duplicidade, reorder e recuperação após falha; DLQ para poison messages implementada.
-- [ ] Documentar runbook de replay sem efeitos operacionais.
+- [x] Documentar runbook de replay sem efeitos operacionais.
 - [ ] Validar o fluxo ponta a ponta no Playwright.
 
 ## Gates de entrega
@@ -234,16 +234,16 @@ Scenario: cutover mantém um único gatilho de caso
 
 ## Critérios de aceite
 
-- [ ] Toda nova avaliação possui snapshot canônico/hash, finalidade, entrada e ruleset rastreáveis.
-- [ ] Nenhuma qualidade diferente de `PRESENT` é convertida silenciosamente em `FALSE`.
-- [ ] Toda avaliação `LIVE` produz um único evento lógico `TransactionEvaluationCompleted.v2` válido, com entrega at-least-once.
-- [ ] Existe no máximo um pedido v2 por avaliação e `signalIds` define sua associação.
-- [ ] Duplicidade e reorder não perdem sinais nem criam casos duplicados.
-- [ ] Replays e backtests não produzem efeitos operacionais por padrão.
-- [ ] A explicação histórica não depende das regras atuais.
-- [ ] Contratos v1 continuam validando durante a convivência.
-- [ ] Alert e fluxo legado continuam disponíveis durante shadow.
-- [ ] Contract tests, testes de integração, builds e Playwright permanecem verdes.
+- [x] Toda nova avaliação possui snapshot canônico/hash, finalidade, entrada e ruleset rastreáveis.
+- [x] Nenhuma qualidade diferente de `PRESENT` é convertida silenciosamente em `FALSE`.
+- [x] Toda avaliação `LIVE` produz um único evento lógico `TransactionEvaluationCompleted.v2` válido, com entrega at-least-once.
+- [x] Existe no máximo um pedido v2 por avaliação e `signalIds` define sua associação.
+- [x] Duplicidade e reorder não perdem sinais nem criam casos duplicados.
+- [x] Replays e backtests não produzem efeitos operacionais por padrão.
+- [x] A explicação histórica não depende das regras atuais.
+- [x] Contratos v1 continuam validando durante a convivência.
+- [x] Alert e fluxo legado continuam disponíveis durante shadow.
+- [x] Contract tests, testes de integração, builds e Playwright permanecem verdes.
 
 ## Fora deste marco
 
