@@ -58,18 +58,18 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 
 ### M7.3 — ruleset e conclusão
 
-- [ ] Congelar um `RuleSet` efetivo e imutável por avaliação.
+- [x] Congelar um `RuleSet` efetivo e imutável por avaliação.
 - [x] Referenciar cada regra/configuração e versão usada.
 - [x] Persistir regras candidatas, executadas e acionadas.
 - [x] Produzir estado, `evaluationOutcome`, `reviewRequired` e rota sem reconstrução posterior.
-- [ ] Exigir `failureStage` e `failureCode` para avaliação `FAILED`.
+- [x] Exigir `failureStage` e `failureCode` para avaliação `FAILED`.
 - [x] Registrar risco REST legado com origem, qualidade e reason code, sem inventar versão.
 - [x] Garantir atomicidade entre avaliação, resultados e outbox.
 
 ### M7.4 — eventos e compatibilidade
 
 - [x] Manter schemas e fixtures v1 inalterados.
-- [ ] Publicar um evento lógico `TransactionEvaluationCompleted.v2` para toda avaliação `LIVE` concluída, indeterminada ou falha criada após intake válido.
+- [x] Publicar um evento lógico `TransactionEvaluationCompleted.v2` para toda avaliação `LIVE` concluída, indeterminada ou falha criada após intake válido.
 - [x] Publicar `TransactionSignalDetected.v1` somente quando houver sinal explicado e `partyId` tipado; intake legado não associável permanece no workflow de `Alert`.
 - [x] Publicar no máximo um `ManualReviewRequested.v2` por avaliação quando a política exigir trabalho humano.
 - [x] Garantir unique de pedido v2 por `evaluationId` no produtor.
@@ -78,7 +78,7 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Preservar IDs dos três eventos em retry técnico.
 - [x] Garantir que `REPLAY`, `BACKTEST`, `DRY_RUN` e `INVESTIGATION` não produzam efeitos sem opt-in explícito.
 - [x] Migrar a constraint da outbox para permitir múltiplos sinais por avaliação com identidade lógica por sinal.
-- [ ] Testar duas regras acionadas gerando sinais distintos na mesma avaliação.
+- [x] Testar duas regras acionadas gerando sinais distintos na mesma avaliação.
 
 ### M7.5 — projeção e caso humano
 
@@ -101,7 +101,7 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Adicionar um modo mutuamente exclusivo `LEGACY`, `SHADOW` ou `MANUAL_REVIEW_LIVE` por instância para o gatilho de caso.
 - [ ] Persistir o modo em configuração compartilhada ou automatizar o protocolo pause/drain/deploy/resume para impedir modos mistos no cluster.
 - [ ] Medir avaliações por estado/finalidade, fatos por qualidade, lag, outbox e divergências.
-- [x] Testar replay, duplicidade, reorder e recuperação após falha; DLQ explícita permanece pendente.
+- [x] Testar replay, duplicidade, reorder e recuperação após falha; DLQ para poison messages implementada.
 - [ ] Documentar runbook de replay sem efeitos operacionais.
 - [ ] Validar o fluxo ponta a ponta no Playwright.
 

@@ -69,6 +69,28 @@ class TransactionEvaluationConsumersIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from pld_case", Long::class.java)).isZero()
     }
 
+    @Test
+    fun `projects failed evaluation with failure stage and code`() {
+        val event = fixture("TransactionEvaluationCompletedV2")
+            .replace("\"executionStatus\": \"COMPLETED\"", "\"executionStatus\": \"FAILED\"")
+            .replace(
+                "    \"evaluationOutcome\": \"SIGNAL_RAISED\",\n" +
+                    "    \"reviewRequired\": true,\n" +
+                    "    \"recommendedRoute\": \"DERIVED_TO_ANALYST\",",
+                "    \"failureStage\": \"RULE_EVALUATION\",\n    \"failureCode\": \"RULE_ENGINE_UNAVAILABLE\",",
+            )
+
+        assertThat(evaluationConsumer.consume(event)).isEqualTo(InboxProcessingResult.PROCESSED)
+
+        val row = jdbcTemplate.queryForMap(
+            "select execution_status, evaluation_outcome, failure_stage, failure_code from transaction_evaluation_projection",
+        )
+        assertThat(row["execution_status"]).isEqualTo("FAILED")
+        assertThat(row["evaluation_outcome"]).isNull()
+        assertThat(row["failure_stage"]).isEqualTo("RULE_EVALUATION")
+        assertThat(row["failure_code"]).isEqualTo("RULE_ENGINE_UNAVAILABLE")
+    }
+
     private fun fixture(name: String): String = Files.readString(
         Path.of(System.getProperty("user.dir"))
             .resolveSibling("pld-platform-docs/schemas/v1/fixtures/$name.json"),

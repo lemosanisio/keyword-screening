@@ -10,7 +10,10 @@ import br.com.decision.domain.model.ConfigurationVersionEntry
 import br.com.decision.domain.model.DecisionExecution
 import br.com.decision.domain.model.DecisionExplanation
 import br.com.decision.domain.model.DecisionResult
+import br.com.decision.domain.model.EvaluationStageException
+import br.com.decision.domain.model.EvaluationStatus
 import br.com.decision.domain.model.ExpressionEvaluation
+import br.com.decision.domain.model.FailureStage
 import br.com.decision.domain.model.RuleConfiguration
 import br.com.decision.domain.model.RuleDefinition
 import br.com.decision.domain.model.enums.Action
@@ -228,6 +231,59 @@ class DecisionServiceTest {
             verify(exactly = 0) { decisionEngine.evaluate(any(), any(), any()) }
             verify(exactly = 0) { decisionExecutionRepository.save(any()) }
             verify(exactly = 0) { domainEventPublisher.publish(any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("Evaluation failure — FAILED evaluation")
+    inner class EvaluationFailure {
+
+        @Test
+        fun `engine failure persists and publishes FAILED evaluation without outcome`() {
+            every { ruleDefinitionRepository.findByCode(ruleCode) } returns ruleDefinition
+            every {
+                decisionExecutionRepository.findByTransactionIdAndRuleId(TransactionId("TX-001"), ruleId)
+            } returns null
+            every { ruleConfigurationRepository.findActiveByRuleId(ruleId) } returns activeConfig
+            every { decisionEngine.evaluate(any(), any(), any()) } throws
+                EvaluationStageException(FailureStage.FACT_RESOLUTION, IllegalStateException("risk REST unavailable"))
+            every { decisionExecutionRepository.save(any()) } answers { firstArg() }
+            every { domainEventPublisher.publish(any()) } just Runs
+
+            val result = decisionService.execute(buildCommand())
+
+            assertThat(result.evaluationStatus).isEqualTo(EvaluationStatus.FAILED)
+            assertThat(result.decision).isEqualTo(Decision.IGNORE)
+            assertThat(result.actions).isEmpty()
+
+            val savedEvaluation = slot<br.com.evaluation.domain.TransactionEvaluation>()
+            verify(exactly = 1) { transactionEvaluationRepository.save(capture(savedEvaluation)) }
+            with(savedEvaluation.captured) {
+                assertThat(executionStatus).isEqualTo(EvaluationStatus.FAILED)
+                assertThat(failureStage).isEqualTo(FailureStage.FACT_RESOLUTION)
+                assertThat(failureCode).isEqualTo("IllegalStateException")
+                assertThat(evaluationOutcome).isNull()
+                assertThat(reviewRequired).isNull()
+                assertThat(recommendedRoute).isNull()
+                assertThat(rulesTriggered).isEmpty()
+            }
+            verify(exactly = 1) { domainEventPublisher.publish(any()) }
+        }
+
+        @Test
+        fun `persistence failure still propagates for retry`() {
+            every { ruleDefinitionRepository.findByCode(ruleCode) } returns ruleDefinition
+            every {
+                decisionExecutionRepository.findByTransactionIdAndRuleId(TransactionId("TX-001"), ruleId)
+            } returns null
+            every { ruleConfigurationRepository.findActiveByRuleId(ruleId) } returns activeConfig
+            every { decisionEngine.evaluate(any(), any(), any()) } throws
+                EvaluationStageException(FailureStage.RULE_EVALUATION, IllegalStateException("boom"))
+            every { decisionExecutionRepository.save(any()) } throws
+                org.springframework.dao.DataIntegrityViolationException("db down")
+
+            org.assertj.core.api.Assertions.assertThatThrownBy { decisionService.execute(buildCommand()) }
+                .isInstanceOf(org.springframework.dao.DataAccessException::class.java)
         }
     }
 

@@ -15,4 +15,5 @@ data class SqsIntegrationProperties(
     val inboundFixedDelay: String = "PT5S",
     val inboundMaxMessages: Int = 10,
     val transactionSignalsQueueUrl: String = "",
+    val transactionSignalsDlqUrl: String = "",
 )

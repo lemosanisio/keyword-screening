@@ -65,3 +65,4 @@ pld:
       inbound-fixed-delay: ${PLD_INTEGRATION_SQS_INBOUND_FIXED_DELAY:PT5S}
       inbound-max-messages: ${PLD_INTEGRATION_SQS_INBOUND_MAX_MESSAGES:10}
       transaction-signals-queue-url: ${PLD_INTEGRATION_SQS_TRANSACTION_SIGNALS_QUEUE_URL:}
+      transaction-signals-dlq-url: ${PLD_INTEGRATION_SQS_TRANSACTION_SIGNALS_DLQ_URL:}

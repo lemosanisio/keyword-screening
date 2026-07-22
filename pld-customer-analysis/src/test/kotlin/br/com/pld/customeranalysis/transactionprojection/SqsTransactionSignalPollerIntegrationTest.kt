@@ -54,7 +54,27 @@ class SqsTransactionSignalPollerIntegrationTest {
         jdbcTemplate.execute(
             "truncate table manual_review_request, transaction_signal_projection, transaction_evaluation_projection, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
-        purgeQueue()
+        purgeQueue(queueUrl)
+        purgeQueue(dlqUrl)
+    }
+
+    @Test
+    fun `moves malformed and unsupported messages to the dlq and deletes them`() {
+        sqsClient.sendMessage(
+            SendMessageRequest.builder().queueUrl(queueUrl).messageBody("not-json").build(),
+        )
+        sqsClient.sendMessage(
+            SendMessageRequest.builder()
+                .queueUrl(queueUrl)
+                .messageBody("""{"eventType":"TransactionSignalDetected","eventVersion":99}""")
+                .build(),
+        )
+
+        poller.poll()
+
+        assertThat(visibleMessageCount(queueUrl)).isEqualTo(0)
+        assertThat(visibleMessageCount(dlqUrl)).isEqualTo(2)
+        assertThat(inboxStatuses()).isEmpty()
     }
 
     @Test
@@ -75,7 +95,7 @@ class SqsTransactionSignalPollerIntegrationTest {
             "CASE_CREATED",
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
-        assertThat(visibleMessageCount()).isEqualTo(0)
+        assertThat(visibleMessageCount(queueUrl)).isEqualTo(0)
     }
 
     @Test
@@ -94,7 +114,7 @@ class SqsTransactionSignalPollerIntegrationTest {
             "CASE_CREATED",
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
-        assertThat(visibleMessageCount()).isEqualTo(0)
+        assertThat(visibleMessageCount(queueUrl)).isEqualTo(0)
     }
 
     @Test
@@ -111,7 +131,7 @@ class SqsTransactionSignalPollerIntegrationTest {
             "select count(*) from transaction_evaluation_projection",
             Long::class.java,
         )).isEqualTo(1)
-        assertThat(visibleMessageCount()).isEqualTo(0)
+        assertThat(visibleMessageCount(queueUrl)).isEqualTo(0)
     }
 
     private fun createParty(): String = partyService.create(
@@ -135,10 +155,10 @@ class SqsTransactionSignalPollerIntegrationTest {
         String::class.java,
     )
 
-    private fun visibleMessageCount(): Int {
+    private fun visibleMessageCount(targetQueueUrl: String): Int {
         val response = sqsClient.getQueueAttributes(
             GetQueueAttributesRequest.builder()
-                .queueUrl(queueUrl)
+                .queueUrl(targetQueueUrl)
                 .attributeNames(QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES)
                 .build(),
         )
@@ -146,17 +166,17 @@ class SqsTransactionSignalPollerIntegrationTest {
         return response.attributes()[QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES]?.toInt() ?: 0
     }
 
-    private fun purgeQueue() {
+    private fun purgeQueue(targetQueueUrl: String) {
         repeat(10) {
             val messages = sqsClient.receiveMessage { builder ->
-                builder.queueUrl(queueUrl)
+                builder.queueUrl(targetQueueUrl)
                     .maxNumberOfMessages(10)
                     .waitTimeSeconds(0)
             }.messages()
 
             messages.forEach { message ->
                 sqsClient.deleteMessage { builder ->
-                    builder.queueUrl(queueUrl).receiptHandle(message.receiptHandle())
+                    builder.queueUrl(targetQueueUrl).receiptHandle(message.receiptHandle())
                 }
             }
         }
@@ -213,6 +233,7 @@ class SqsTransactionSignalPollerIntegrationTest {
 
         private lateinit var sqsClient: SqsClient
         private lateinit var queueUrl: String
+        private lateinit var dlqUrl: String
 
         @JvmStatic
         @DynamicPropertySource
@@ -227,6 +248,7 @@ class SqsTransactionSignalPollerIntegrationTest {
                 )
                 .build()
             queueUrl = sqsClient.createQueue { it.queueName("customer-analysis-transaction-signals-test") }.queueUrl()
+            dlqUrl = sqsClient.createQueue { it.queueName("customer-analysis-transaction-signals-dlq-test") }.queueUrl()
 
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
@@ -239,6 +261,7 @@ class SqsTransactionSignalPollerIntegrationTest {
             registry.add("pld.integration.sqs.secret-access-key", localstack::getSecretKey)
             registry.add("pld.integration.sqs.outbox-queue-url") { queueUrl }
             registry.add("pld.integration.sqs.transaction-signals-queue-url") { queueUrl }
+            registry.add("pld.integration.sqs.transaction-signals-dlq-url") { dlqUrl }
         }
     }
 }

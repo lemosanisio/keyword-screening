@@ -61,6 +61,25 @@ class ContractSchemaValidationTest {
     }
 
     @Test
+    fun `avaliacao failed valida com failureStage e failureCode sem outcome`() {
+        val fixture = mapper.readTree(Files.readString(fixturePath("TransactionEvaluationCompletedV2")))
+            as ObjectNode
+        val payload = fixture.get("payload") as ObjectNode
+        payload.put("executionStatus", "FAILED")
+        payload.put("failureStage", "RULE_EVALUATION")
+        payload.put("failureCode", "RULE_ENGINE_UNAVAILABLE")
+        payload.remove("evaluationOutcome")
+        payload.remove("reviewRequired")
+        payload.remove("recommendedRoute")
+
+        val errors = validate("TransactionEvaluationCompletedV2", mapper.writeValueAsString(fixture))
+
+        assertThat(errors)
+            .`as`("Avaliação FAILED válida:\n%s", errors.joinToString("\n"))
+            .isEmpty()
+    }
+
+    @Test
     fun `avaliacao failed rejeita outcome e revisao`() {
         val fixture = mapper.readTree(Files.readString(fixturePath("TransactionEvaluationCompletedV2")))
             as ObjectNode

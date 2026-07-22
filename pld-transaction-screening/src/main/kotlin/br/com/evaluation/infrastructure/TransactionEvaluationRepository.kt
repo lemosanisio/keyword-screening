@@ -26,9 +26,12 @@ interface TransactionEvaluationJpaRepository : JpaRepository<TransactionEvaluati
 }
 
 @Repository
-class TransactionEvaluationRepository(private val repository: TransactionEvaluationJpaRepository) {
+class TransactionEvaluationRepository(
+    private val repository: TransactionEvaluationJpaRepository,
+    private val jdbcTemplate: org.springframework.jdbc.core.JdbcTemplate,
+) {
     fun save(evaluation: TransactionEvaluation): TransactionEvaluation {
-        repository.save(
+        repository.saveAndFlush(
             TransactionEvaluationEntity(
                 evaluationId = evaluation.evaluationId,
                 decisionExecutionId = evaluation.decisionExecutionId,
@@ -71,8 +74,21 @@ class TransactionEvaluationRepository(private val repository: TransactionEvaluat
                 correlationId = evaluation.correlationId,
                 causationId = evaluation.causationId,
                 evaluatedAt = evaluation.evaluatedAt,
+                failureStage = evaluation.failureStage?.name,
+                failureCode = evaluation.failureCode,
             ),
         )
+        evaluation.executions.forEach { link ->
+            jdbcTemplate.update(
+                """
+                    INSERT INTO transaction_evaluation_execution (evaluation_id, decision_execution_id, rule_code)
+                    VALUES (?, ?, ?)
+                """.trimIndent(),
+                evaluation.evaluationId,
+                link.decisionExecutionId,
+                link.ruleCode,
+            )
+        }
         return evaluation
     }
 

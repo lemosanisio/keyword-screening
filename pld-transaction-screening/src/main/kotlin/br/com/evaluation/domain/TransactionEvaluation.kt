@@ -3,6 +3,7 @@ package br.com.evaluation.domain
 import br.com.decision.domain.model.EvaluationOutcome
 import br.com.decision.domain.model.EvaluationStatus
 import br.com.decision.domain.model.FactResult
+import br.com.decision.domain.model.FailureStage
 import br.com.decision.domain.model.RecommendedRoute
 import java.time.Instant
 import java.util.UUID
@@ -18,6 +19,12 @@ data class RiskContext(
     val quality: String,
     val reasonCode: String? = null,
     val riskProfileVersion: Int? = null,
+)
+
+/** Vínculo entre a avaliação e uma execução de regra persistida. */
+data class ExecutionLink(
+    val decisionExecutionId: UUID,
+    val ruleCode: String,
 )
 
 data class TransactionEvaluation(
@@ -49,4 +56,25 @@ data class TransactionEvaluation(
     val correlationId: String,
     val causationId: String?,
     val evaluatedAt: Instant,
-)
+    val failureStage: FailureStage? = null,
+    val failureCode: String? = null,
+    val executions: List<ExecutionLink> = listOf(ExecutionLink(decisionExecutionId, "")),
+) {
+    init {
+        require(executions.isNotEmpty() && executions.any { it.decisionExecutionId == decisionExecutionId }) {
+            "executions deve conter a execução principal"
+        }
+        if (executionStatus == EvaluationStatus.FAILED) {
+            require(failureStage != null && !failureCode.isNullOrBlank()) {
+                "failureStage e failureCode são obrigatórios para avaliação FAILED"
+            }
+            require(evaluationOutcome == null && reviewRequired == null && recommendedRoute == null) {
+                "avaliação FAILED não possui outcome nem roteamento"
+            }
+        } else {
+            require(failureStage == null && failureCode == null) {
+                "failureStage/failureCode só existem em avaliação FAILED"
+            }
+        }
+    }
+}

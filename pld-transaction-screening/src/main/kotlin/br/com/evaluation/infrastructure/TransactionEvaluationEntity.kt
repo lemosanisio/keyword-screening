@@ -75,4 +75,8 @@ class TransactionEvaluationEntity(
     val causationId: String? = null,
     @Column(name = "evaluated_at", nullable = false)
     val evaluatedAt: Instant = Instant.now(),
+    @Column(name = "failure_stage")
+    val failureStage: String? = null,
+    @Column(name = "failure_code")
+    val failureCode: String? = null,
 )

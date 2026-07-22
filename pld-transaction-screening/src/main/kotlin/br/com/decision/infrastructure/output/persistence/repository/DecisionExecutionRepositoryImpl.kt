@@ -42,4 +42,7 @@ class DecisionExecutionRepositoryImpl(
 
     override fun findByTraceId(traceId: TraceId): DecisionExecution? =
         jpaRepository.findByTraceId(traceId.value)?.let { mapper.toDomain(it) }
+
+    override fun findByEvaluationId(evaluationId: String): List<DecisionExecution> =
+        jpaRepository.findByEvaluationId(evaluationId).map { mapper.toDomain(it) }
 }

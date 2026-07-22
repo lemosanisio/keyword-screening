@@ -7,8 +7,10 @@ import br.com.decision.domain.model.DecisionExplanation
 import br.com.decision.domain.model.DecisionResult
 import br.com.decision.domain.model.DecisionStep
 import br.com.decision.domain.model.EvaluationStep
+import br.com.decision.domain.model.EvaluationStageException
 import br.com.decision.domain.model.EvaluationStatus
 import br.com.decision.domain.model.EvaluationOutcome
+import br.com.decision.domain.model.FailureStage
 import br.com.decision.domain.model.RecommendedRoute
 import br.com.decision.domain.model.PersistenceStep
 import br.com.decision.domain.model.PublicationStep
@@ -95,14 +97,22 @@ class DecisionEngine(
         val requiredFacts = extractRequiredFacts(configuration)
 
         // Step 3: Build context
-        val factSet = contextBuilder.buildContext(event, requiredFacts)
+        val factSet = try {
+            contextBuilder.buildContext(event, requiredFacts)
+        } catch (e: Exception) {
+            throw EvaluationStageException(FailureStage.FACT_RESOLUTION, e)
+        }
         val contextBuildingStep = ContextBuildingStep(
             timestamp = Instant.now(),
             resolverResults = factSet.resolverResults
         )
 
         // Step 4: Evaluate rules
-        val ruleEvaluationResult = ruleEngine.evaluate(factSet.facts, configuration.expressions)
+        val ruleEvaluationResult = try {
+            ruleEngine.evaluate(factSet.facts, configuration.expressions)
+        } catch (e: Exception) {
+            throw EvaluationStageException(FailureStage.RULE_EVALUATION, e)
+        }
         val evaluationStep = EvaluationStep(
             timestamp = Instant.now(),
             evaluations = ruleEvaluationResult.evaluations

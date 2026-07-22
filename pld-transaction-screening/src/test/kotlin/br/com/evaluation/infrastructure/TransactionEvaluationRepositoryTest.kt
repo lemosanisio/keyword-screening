@@ -7,7 +7,10 @@ import org.junit.jupiter.api.Test
 
 class TransactionEvaluationRepositoryTest {
     private val jpaRepository = mockk<TransactionEvaluationJpaRepository>()
-    private val repository = TransactionEvaluationRepository(jpaRepository)
+    private val repository = TransactionEvaluationRepository(
+        jpaRepository,
+        mockk<org.springframework.jdbc.core.JdbcTemplate>(relaxed = true),
+    )
 
     @Test
     fun `same input event rejects a different ruleset`() {

@@ -8,6 +8,9 @@ import br.com.decision.domain.event.DetectionResult
 import br.com.decision.domain.model.DecisionExecution
 import br.com.decision.domain.model.DecisionExplanation
 import br.com.decision.domain.model.DecisionResult
+import br.com.decision.domain.model.EvaluationStageException
+import br.com.decision.domain.model.EvaluationStatus
+import br.com.decision.domain.model.FailureStage
 import br.com.decision.domain.model.enums.Action
 import br.com.decision.domain.model.enums.Decision
 import br.com.decision.domain.port.DecisionExecutionRepository
@@ -152,8 +155,21 @@ class DecisionService(
         // 4. Construir DetectionEvent a partir do command
         val detectionEvent = buildDetectionEvent(command, traceId)
 
-        // 5. Invocar DecisionEngine
-        val decisionResult = decisionEngine.evaluate(detectionEvent, activeConfig, traceId)
+        // 5. Invocar DecisionEngine; falha de negócio vira avaliação FAILED persistida
+        val decisionResult = try {
+            decisionEngine.evaluate(detectionEvent, activeConfig, traceId)
+        } catch (failure: Exception) {
+            if (failure is DataAccessException) throw failure
+            return handleEvaluationFailure(
+                command = command,
+                ruleDefinition = ruleDefinition,
+                activeConfig = activeConfig,
+                traceId = traceId,
+                correlationId = correlationId,
+                contractTransactionId = contractTransactionId,
+                failure = failure,
+            )
+        }
         val evaluationId = PrefixedUlid.next("evl_")
 
         // 6. Persistir DecisionExecution (com retry 3x para DataAccessException)
@@ -195,6 +211,73 @@ class DecisionService(
         return decisionResult
     }
 
+    /**
+     * Converte falha de negócio após intake/snapshot/ruleset válidos em avaliação FAILED
+     * persistida e publicada. Falhas de persistência continuam propagando para retry.
+     */
+    private fun handleEvaluationFailure(
+        command: ExecuteDecisionCommand,
+        ruleDefinition: br.com.decision.domain.model.RuleDefinition,
+        activeConfig: br.com.decision.domain.model.RuleConfiguration,
+        traceId: TraceId,
+        correlationId: String,
+        contractTransactionId: String,
+        failure: Exception,
+    ): DecisionResult {
+        val stage = (failure as? EvaluationStageException)?.stage ?: FailureStage.RULE_EVALUATION
+        val failureCode = (failure.cause ?: failure)::class.simpleName ?: "UNKNOWN_FAILURE"
+        logger.warn(
+            "Avaliação FAILED: stage={}, code={}, transactionId={}, ruleCode={}",
+            stage,
+            failureCode,
+            command.transactionId.value,
+            command.ruleCode.value,
+        )
+        val evaluationId = PrefixedUlid.next("evl_")
+        val failedResult = DecisionResult(
+            decision = Decision.IGNORE,
+            actions = emptyList(),
+            matchedExpressions = emptyList(),
+            failedExpressions = emptyList(),
+            executionTimeMs = 0L,
+            configurationVersion = activeConfig.currentVersion,
+            facts = emptyMap(),
+            explanation = DecisionExplanation(traceId = traceId, steps = emptyList()),
+            factResults = emptyList(),
+            evaluationStatus = EvaluationStatus.FAILED,
+            evaluationOutcome = br.com.decision.domain.model.EvaluationOutcome.NO_SIGNAL,
+            reviewRequired = false,
+            recommendedRoute = null,
+        )
+        val execution = buildDecisionExecution(
+            transactionId = command.transactionId,
+            ruleId = ruleDefinition.id,
+            configurationVersion = activeConfig.currentVersion,
+            facts = emptyMap(),
+            result = failedResult,
+            explanation = failedResult.explanation!!,
+            executionTimeMs = 0L,
+            traceId = traceId,
+            evaluationId = evaluationId,
+            partyId = command.customerId.value.takeIf(::isTypedPartyId),
+            correlationId = correlationId,
+            causationId = command.causationId,
+        )
+        val savedExecution = saveWithRetry(execution)
+        val evaluation = buildTransactionEvaluation(
+            command = command,
+            execution = savedExecution,
+            ruleCode = ruleDefinition.code.value,
+            decisionResult = failedResult,
+            contractTransactionId = contractTransactionId,
+            failureStage = stage,
+            failureCode = failureCode,
+        )
+        transactionEvaluationRepository.save(evaluation)
+        publishDecisionMade(command, ruleDefinition.id, ruleDefinition.code, failedResult, savedExecution, traceId, evaluation)
+        return failedResult
+    }
+
     private fun publishDecisionMade(
         command: ExecuteDecisionCommand,
         ruleId: RuleId,
@@ -233,8 +316,11 @@ class DecisionService(
         ruleCode: String,
         decisionResult: DecisionResult,
         contractTransactionId: String,
+        failureStage: FailureStage? = null,
+        failureCode: String? = null,
     ): TransactionEvaluation {
         val evaluationId = requireNotNull(execution.evaluationId)
+        val failed = decisionResult.evaluationStatus == EvaluationStatus.FAILED
         val snapshot = evaluationSnapshot(command)
         val canonicalSnapshot = snapshotCanonicalizer.canonicalize(snapshot)
         val riskFact = decisionResult.factResults.firstOrNull { it.name.value == "customerRisk" }
@@ -275,20 +361,27 @@ class DecisionService(
             } else {
                 emptyList()
             },
-            rulesTriggered = if (decisionResult.evaluationOutcome == br.com.decision.domain.model.EvaluationOutcome.SIGNAL_RAISED) {
+            rulesTriggered = if (!failed && decisionResult.evaluationOutcome == br.com.decision.domain.model.EvaluationOutcome.SIGNAL_RAISED) {
                 listOf(ruleReference)
             } else {
                 emptyList()
             },
             executionStatus = decisionResult.evaluationStatus,
-            evaluationOutcome = decisionResult.evaluationOutcome,
-            reviewRequired = decisionResult.reviewRequired,
-            recommendedRoute = decisionResult.recommendedRoute,
-            explanation = listOf(mapOf("code" to decisionResult.decision.name)),
+            evaluationOutcome = decisionResult.evaluationOutcome.takeUnless { failed },
+            reviewRequired = decisionResult.reviewRequired.takeUnless { failed },
+            recommendedRoute = decisionResult.recommendedRoute.takeUnless { failed },
+            explanation = if (failed) {
+                listOf(mapOf("code" to "EVALUATION_FAILED", "detail" to (failureCode ?: "UNKNOWN_FAILURE")))
+            } else {
+                listOf(mapOf("code" to decisionResult.decision.name))
+            },
             partyId = command.customerId.value.takeIf(::isTypedPartyId),
             correlationId = execution.correlationId ?: execution.traceId.value,
             causationId = execution.causationId,
             evaluatedAt = execution.timestamp,
+            failureStage = failureStage,
+            failureCode = failureCode,
+            executions = listOf(br.com.evaluation.domain.ExecutionLink(execution.id, ruleCode)),
         )
     }
 

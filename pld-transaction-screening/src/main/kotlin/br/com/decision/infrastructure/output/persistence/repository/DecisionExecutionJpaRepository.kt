@@ -12,4 +12,5 @@ interface DecisionExecutionJpaRepository : JpaRepository<DecisionExecutionEntity
     fun findByRuleId(ruleId: UUID, pageable: Pageable): Page<DecisionExecutionEntity>
     fun findByDecision(decision: String, pageable: Pageable): Page<DecisionExecutionEntity>
     fun findByTraceId(traceId: String): DecisionExecutionEntity?
+    fun findByEvaluationId(evaluationId: String): List<DecisionExecutionEntity>
 }

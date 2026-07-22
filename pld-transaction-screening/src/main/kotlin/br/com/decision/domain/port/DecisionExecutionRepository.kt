@@ -21,4 +21,5 @@ interface DecisionExecutionRepository {
     fun findByRuleId(ruleId: RuleId, pageable: Pageable): Page<DecisionExecution>
     fun findByDecision(decision: Decision, pageable: Pageable): Page<DecisionExecution>
     fun findByTraceId(traceId: TraceId): DecisionExecution?
+    fun findByEvaluationId(evaluationId: String): List<DecisionExecution>
 }

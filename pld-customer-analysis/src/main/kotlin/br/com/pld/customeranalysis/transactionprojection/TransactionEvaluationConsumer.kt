@@ -38,8 +38,9 @@ class TransactionEvaluationConsumer(
                         source_system, evaluation_id, event_id, party_id, transaction_id, purpose,
                         execution_status, evaluation_outcome, review_required, recommended_route,
                         snapshot_ref, snapshot_format_version, snapshot_hash, ruleset_version,
-                        facts, rules_executed, rules_triggered, explanation, evaluated_at, received_at, payload
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb)
+                        facts, rules_executed, rules_triggered, explanation, evaluated_at, received_at, payload,
+                        failure_stage, failure_code
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb, ?, ?)
                     ON CONFLICT (source_system, evaluation_id) DO NOTHING
                 """.trimIndent(),
                 producer,
@@ -63,6 +64,8 @@ class TransactionEvaluationConsumer(
                 Timestamp.from(Instant.parse(payload.requiredText("evaluatedAt"))),
                 Timestamp.from(Instant.now()),
                 eventJson,
+                payload.optionalText("failureStage"),
+                payload.optionalText("failureCode"),
             )
         }
     }
