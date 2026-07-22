@@ -6,4 +6,5 @@ interface PartyJpaRepository : JpaRepository<PartyEntity, String>
 
 interface PartySnapshotJpaRepository : JpaRepository<PartySnapshotEntity, String> {
     fun findTopByPartyIdOrderBySnapshotVersionDesc(partyId: String): PartySnapshotEntity?
+    fun findByOfficialNameContainingIgnoreCase(name: String): List<PartySnapshotEntity>
 }

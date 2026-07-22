@@ -94,7 +94,7 @@ class ContextualScreeningEndToEndTest {
 
         assertEquals(HttpStatus.OK, response.statusCode)
         assertNotNull(response.body)
-        assertEquals("FALSE_POSITIVE", response.body!!["classification"])
+        assertEquals("NOT_SUSPICIOUS", response.body!!["classification"])
         assertEquals(0.97, response.body!!["confidence"])
         assertEquals("Operação compatível com perfil do cliente", response.body!!["reason"])
         assertEquals(false, response.body!!["requiresAnalystReview"])
@@ -138,7 +138,7 @@ class ContextualScreeningEndToEndTest {
         assertEquals(HttpStatus.OK, response1.statusCode)
         assertEquals(HttpStatus.OK, response2.statusCode)
         assertEquals(response1.body, response2.body)
-        assertEquals("FALSE_POSITIVE", response2.body!!["classification"])
+        assertEquals("NOT_SUSPICIOUS", response2.body!!["classification"])
         assertEquals(0.98, response2.body!!["confidence"])
     }
 

@@ -28,6 +28,7 @@ import br.com.evaluation.infrastructure.SnapshotCanonicalizer
 import br.com.evaluation.infrastructure.TransactionEvaluationRepository
 import br.com.evaluation.infrastructure.TransactionIdentityResolver
 import br.com.evaluation.infrastructure.TransactionEvaluationLock
+import br.com.evaluation.infrastructure.IntakeValidator
 import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.PrefixedUlid
@@ -63,6 +64,7 @@ class DecisionService(
     private val snapshotCanonicalizer: SnapshotCanonicalizer,
     private val transactionEvaluationRepository: TransactionEvaluationRepository,
     private val transactionEvaluationLock: TransactionEvaluationLock,
+    private val intakeValidator: IntakeValidator,
 ) : ExecuteDecisionUseCase {
 
     private val logger = LoggerFactory.getLogger(DecisionService::class.java)
@@ -76,6 +78,22 @@ class DecisionService(
         val traceId = TraceId(correlationId)
         val contractTransactionId = transactionIdentityResolver.resolve(command.sourceSystem, command.transactionId.value)
         transactionEvaluationLock.acquire("transaction", contractTransactionId, command.purpose)
+
+        // Validar intake antes de criar aggregate
+        val intakeResult = intakeValidator.validate(
+            IntakeValidator.IntakeInput(
+                sourceSystem = command.sourceSystem,
+                externalTransactionId = command.transactionId.value,
+                transactionVersion = command.transactionVersion,
+                purpose = command.purpose,
+                snapshot = evaluationSnapshot(command),
+                correlationId = correlationId,
+            )
+        )
+        if (intakeResult is IntakeValidator.IntakeResult.Quarantined) {
+            logger.warn("Intake quarantined: {}", intakeResult.reasonDetail)
+            return buildIgnoreResult()
+        }
 
         // 1. Buscar RuleDefinition pelo ruleCode
         val ruleDefinition = ruleDefinitionRepository.findByCode(command.ruleCode)

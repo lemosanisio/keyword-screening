@@ -59,7 +59,7 @@ class PartyApiIntegrationTest {
             }
 
         org.assertj.core.api.Assertions.assertThat(outboxEventTypes())
-            .containsExactly("PartyCreated")
+            .containsExactly("PartyCreated", "CustomerRiskProfileUpdated")
     }
 
     @Test
@@ -106,7 +106,7 @@ class PartyApiIntegrationTest {
             }
 
         org.assertj.core.api.Assertions.assertThat(outboxEventTypes())
-            .containsExactly("PartyCreated", "AnalysisCycleCreated")
+            .containsExactly("PartyCreated", "CustomerRiskProfileUpdated", "AnalysisCycleCreated")
     }
 
     @Test

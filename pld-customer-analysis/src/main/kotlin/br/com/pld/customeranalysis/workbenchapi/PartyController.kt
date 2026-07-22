@@ -2,6 +2,7 @@ package br.com.pld.customeranalysis.workbenchapi
 
 import br.com.pld.customeranalysis.party.CreatePartyCommand
 import br.com.pld.customeranalysis.party.PartyNotFoundException
+import br.com.pld.customeranalysis.party.PartyRelationshipJpaRepository
 import br.com.pld.customeranalysis.party.PartyService
 import br.com.pld.customeranalysis.party.PartySnapshotView
 import br.com.pld.customeranalysis.party.PartyType
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
+import java.math.BigDecimal
 import java.time.Instant
 
 @RestController
@@ -33,6 +35,7 @@ class PartyController(
     private val partyService: PartyService,
     private val analysisCycleService: AnalysisCycleService,
     private val timelineService: TimelineService,
+    private val partyRelationshipRepository: PartyRelationshipJpaRepository,
     private val actorResolver: ActorResolver,
 ) {
     @PostMapping
@@ -85,6 +88,23 @@ class PartyController(
 
     @GetMapping("/{partyId}/timeline")
     fun timeline(@PathVariable partyId: String): TimelineView = timelineService.getByPartyId(partyId)
+
+    @GetMapping("/{partyId}/relationships")
+    fun relationships(@PathVariable partyId: String): List<RelationshipView> {
+        val relationships = partyRelationshipRepository.findByPartyId(partyId)
+        return relationships.map { rel ->
+            RelationshipView(
+                relationshipId = rel.id,
+                fromPartyId = rel.fromPartyId,
+                toPartyId = rel.toPartyId,
+                type = rel.relationshipType.name,
+                participationPercentage = rel.participationPercentage,
+                startDate = rel.startDate?.toString(),
+                endDate = rel.endDate?.toString(),
+                sourceSystem = rel.sourceSystem,
+            )
+        }
+    }
 
     @ExceptionHandler(PartyNotFoundException::class)
     fun notFound(): ResponseEntity<Void> = ResponseEntity.notFound().build()
@@ -155,3 +175,15 @@ data class AnalysisCycleResponse(
         )
     }
 }
+
+
+data class RelationshipView(
+    val relationshipId: String,
+    val fromPartyId: String,
+    val toPartyId: String,
+    val type: String,
+    val participationPercentage: BigDecimal?,
+    val startDate: String?,
+    val endDate: String?,
+    val sourceSystem: String,
+)

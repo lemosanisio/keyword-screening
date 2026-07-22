@@ -13,6 +13,8 @@ interface CaseJpaRepository : JpaRepository<CaseEntity, String> {
     fun findByStatusOrderByCreatedAtAsc(status: CaseStatus): List<CaseEntity>
 
     fun findByStatusInOrderByCreatedAtAsc(statuses: Collection<CaseStatus>): List<CaseEntity>
+
+    fun findByPartyIdOrderByCreatedAtDesc(partyId: String): List<CaseEntity>
 }
 
 interface CaseSourceJpaRepository : JpaRepository<CaseSourceEntity, String> {

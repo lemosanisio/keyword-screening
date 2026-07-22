@@ -81,7 +81,7 @@ class LlmFallbackIntegrationTest {
         val results = jdbcTemplate.queryForList(
             """
             SELECT transaction_id, final_classification, final_confidence, 
-                   requires_analyst_review, model_response
+                   requires_analyst_review, model_response::text as model_response
             FROM contextual_screening_audit 
             WHERE transaction_id = ? AND rule_id = ?
             """.trimIndent(),
@@ -106,7 +106,7 @@ class LlmFallbackIntegrationTest {
 
         assertEquals(HttpStatus.OK, response.statusCode)
         val body = response.body!!
-        assertEquals("UNCERTAIN", body["classification"])
+        assertEquals("INCONCLUSIVE", body["classification"])
         assertEquals(0.0, (body["confidence"] as Number).toDouble())
         assertEquals(true, body["requiresAnalystReview"])
 
@@ -136,7 +136,7 @@ class LlmFallbackIntegrationTest {
 
         assertEquals(HttpStatus.OK, response.statusCode)
         val body = response.body!!
-        assertEquals("UNCERTAIN", body["classification"])
+        assertEquals("INCONCLUSIVE", body["classification"])
         assertEquals(0.0, (body["confidence"] as Number).toDouble())
         assertEquals(true, body["requiresAnalystReview"])
 
@@ -164,7 +164,7 @@ class LlmFallbackIntegrationTest {
 
         assertEquals(HttpStatus.OK, response.statusCode)
         val body = response.body!!
-        assertEquals("UNCERTAIN", body["classification"])
+        assertEquals("INCONCLUSIVE", body["classification"])
         assertEquals(0.0, (body["confidence"] as Number).toDouble())
         assertEquals(true, body["requiresAnalystReview"])
 

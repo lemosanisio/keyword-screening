@@ -57,6 +57,7 @@ import br.com.evaluation.infrastructure.SnapshotCanonicalizer
 import br.com.evaluation.infrastructure.TransactionEvaluationRepository
 import br.com.evaluation.infrastructure.TransactionIdentityResolver
 import br.com.evaluation.infrastructure.TransactionEvaluationLock
+import br.com.evaluation.infrastructure.IntakeValidator
 
 @DisplayName("DecisionService — Unit Tests")
 class DecisionServiceTest {
@@ -70,11 +71,13 @@ class DecisionServiceTest {
     private val snapshotCanonicalizer = mockk<SnapshotCanonicalizer>()
     private val transactionEvaluationRepository = mockk<TransactionEvaluationRepository>(relaxed = true)
     private val transactionEvaluationLock = mockk<TransactionEvaluationLock>(relaxed = true)
+    private val intakeValidator = mockk<IntakeValidator>()
 
     init {
         every { transactionIdentityResolver.resolve(any(), any()) } answers { secondArg() }
         every { snapshotCanonicalizer.canonicalize(any()) } returns CanonicalSnapshot("{}", "0".repeat(64))
         every { transactionEvaluationRepository.findDecisionExecutionId(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns null
+        every { intakeValidator.validate(any()) } returns IntakeValidator.IntakeResult.Valid
     }
 
     private val decisionService = DecisionService(
@@ -87,6 +90,7 @@ class DecisionServiceTest {
         snapshotCanonicalizer = snapshotCanonicalizer,
         transactionEvaluationRepository = transactionEvaluationRepository,
         transactionEvaluationLock = transactionEvaluationLock,
+        intakeValidator = intakeValidator,
     )
 
     private val ruleId = RuleId(UUID.randomUUID())

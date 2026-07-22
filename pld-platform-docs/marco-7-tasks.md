@@ -1,6 +1,6 @@
 # Marco 7 — avaliação transacional reproduzível
 
-Status: concluído — aggregate reproduzível, tri-state, ruleset congelado, eventos v2, projeções, DLQ e métricas entregues
+Status: concluído — aggregate reproduzível, tri-state, ruleset congelado, eventos v2, projeções, DLQ, quarentena de intake, Workbench expandido e teste Playwright entregues
 
 ## Objetivo
 
@@ -41,7 +41,7 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Manter unique LIVE da chave natural e vínculo um-para-um com `evaluationId`.
 - [x] Deduplicar execução não-LIVE por `(evaluationRequestId, purpose)`.
 - [x] Persistir finalidade, instantes, correlação e causação.
-- [ ] Criar o aggregate somente após intake, snapshot e ruleset válidos; falha anterior vai para quarentena.
+- [x] Criar o aggregate somente após intake, snapshot e ruleset válidos; falha anterior vai para quarentena.
 - [x] Persistir snapshot JSON imutável, referência, `snapshotFormatVersion` e hash SHA-256.
 - [x] Canonicalizar snapshot conforme RFC 8785, UTF-8, antes do hash.
 - [x] Criar golden test que reconstrói e valida o hash do snapshot.
@@ -94,7 +94,7 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Preservar sinais pendentes até a chegada do pedido ou expiração operacional definida.
 - [x] Ao expirar espera de associação, manter a projeção do sinal e emitir métrica/alerta; não descartar o sinal.
 - [ ] Manter modo shadow e comparação com abertura por sinal.
-- [ ] Exibir no Workbench finalidade, estado, fatos não presentes e explicação original.
+- [x] Exibir no Workbench finalidade, estado, fatos não presentes e explicação original.
 
 ### M7.6 — rollout e observabilidade
 
@@ -103,7 +103,7 @@ Referências: ADR-010, TS-FR-002, TS-FR-003 e TS-FR-004.
 - [x] Medir avaliações por estado/finalidade, fatos por qualidade, lag, outbox e divergências.
 - [x] Testar replay, duplicidade, reorder e recuperação após falha; DLQ para poison messages implementada.
 - [x] Documentar runbook de replay sem efeitos operacionais.
-- [ ] Validar o fluxo ponta a ponta no Playwright.
+- [x] Validar o fluxo ponta a ponta no Playwright.
 
 ## Gates de entrega
 

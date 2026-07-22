@@ -17,6 +17,7 @@ class PartyService(
     private val snapshotRepository: PartySnapshotJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val outboxService: OutboxService,
+    private val riskProfilePublisher: RiskProfilePublisher,
     private val clock: Clock = Clock.systemUTC(),
 ) {
 
@@ -77,6 +78,8 @@ class PartyService(
                 "correlationId" to command.correlationId,
             ),
         )
+
+        riskProfilePublisher.publishForParty(partyId, command.officialName, command.correlationId)
 
         return PartyView.from(partyRepository.getReferenceById(partyId), snapshot)
     }

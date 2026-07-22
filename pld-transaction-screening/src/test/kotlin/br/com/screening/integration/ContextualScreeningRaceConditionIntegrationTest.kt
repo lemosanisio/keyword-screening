@@ -118,7 +118,7 @@ class ContextualScreeningRaceConditionIntegrationTest {
             assertEquals(1, classifications.distinct().size)
             assertEquals(1, confidences.distinct().size)
             assertEquals(1, requiresReviews.distinct().size)
-            assertEquals("FALSE_POSITIVE", classifications.first())
+            assertEquals("NOT_SUSPICIOUS", classifications.first())
 
             val count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM contextual_screening_audit WHERE transaction_id = ? AND rule_id = ?",

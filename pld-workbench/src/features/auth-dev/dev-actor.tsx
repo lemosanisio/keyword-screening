@@ -5,6 +5,7 @@ import { Select } from "@/components/ui/select";
 const actors: DevActor[] = [
   { id: "analyst-1", role: "ANALYST", label: "Analista 1" },
   { id: "approver-1", role: "APPROVER", label: "Aprovador 1" },
+  { id: "rule-admin-1", role: "RULE_ADMIN", label: "Admin Regras 1" },
   { id: "auditor-1", role: "AUDITOR", label: "Auditor 1" }
 ];
 

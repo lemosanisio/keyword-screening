@@ -1,0 +1,1 @@
+{"mcpServers":{"playwright":{"command":"bunx","args":["@playwright/mcp@latest","--headless","--isolated","--executable-path","/usr/bin/chromium","--output-dir","/tmp/kiro/playwright","--console-level","warning"],"disabled":false}}}

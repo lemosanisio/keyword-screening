@@ -16,6 +16,10 @@ class PartyEntity(
     @Enumerated(EnumType.STRING)
     var partyType: PartyType = PartyType.PERSON,
 
+    var lastReviewCompletedAt: Instant? = null,
+
+    var currentRiskLevel: String? = "LOW",
+
     var createdAt: Instant = Instant.EPOCH,
 
     var updatedAt: Instant = Instant.EPOCH,

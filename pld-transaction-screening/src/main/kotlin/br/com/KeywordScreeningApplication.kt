@@ -1,6 +1,7 @@
 package br.com
 
 import br.com.decision.infrastructure.configuration.CustomerRiskProperties
+import br.com.decision.infrastructure.output.projection.RiskProfileConsumerProperties
 import br.com.integration.OutboxDrainProperties
 import br.com.integration.SqsProperties
 import br.com.integration.TransactionSignalProperties
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
     TransactionSignalProperties::class,
     SqsProperties::class,
     OutboxDrainProperties::class,
+    RiskProfileConsumerProperties::class,
 )
 class KeywordScreeningApplication
 

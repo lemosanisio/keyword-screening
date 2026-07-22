@@ -16,11 +16,24 @@ class RuleConfigurationRepositoryImpl(
 
     override fun save(config: RuleConfiguration): RuleConfiguration {
         val entity = mapper.toEntity(config)
+        val isNew = !jpaRepository.existsById(config.id)
         val saved = jpaRepository.save(entity)
 
-        // Save version entries
-        val versionEntities = config.versions.map { mapper.versionToEntity(it, saved.id) }
-        versionJpaRepository.saveAll(versionEntities)
+        if (isNew) {
+            // Somente insere versions na criação; updates e ativação não alteram versions existentes
+            val versionEntities = config.versions.map { mapper.versionToEntity(it, saved.id) }
+            versionJpaRepository.saveAll(versionEntities)
+        } else {
+            // Inserir apenas versions novas (versão maior que a última persistida)
+            val existingVersions = versionJpaRepository.findByConfigurationId(saved.id)
+                .map { it.version }
+                .toSet()
+            val newVersions = config.versions.filter { it.version.value !in existingVersions }
+            if (newVersions.isNotEmpty()) {
+                val versionEntities = newVersions.map { mapper.versionToEntity(it, saved.id) }
+                versionJpaRepository.saveAll(versionEntities)
+            }
+        }
 
         return findById(saved.id) ?: mapper.toDomain(saved)
     }

@@ -165,7 +165,7 @@ class AlertGenerationPropertyTest {
         // DecisionMadeEventListener checks actions before calling service.
         // When GENERATE_ALERT is NOT in actions, the listener does NOT call createAlertIfNotExists.
         // This property verifies the listener behavior.
-        val listener = br.com.alert.infrastructure.input.event.DecisionMadeEventListener(alertService)
+        val listener = br.com.alert.infrastructure.input.event.DecisionMadeEventListener(alertService, "LEGACY")
         listener.handle(event)
 
         // Verify: no interaction with the repository (no alert created)

@@ -109,7 +109,7 @@ class AnalystFeedbackIntegrationTest {
         val keyword = "terrorismo"
 
         createAuditViaEvaluate(transactionId, keyword)
-        val response = postDecision(transactionId, "FALSE_POSITIVE")
+        val response = postDecision(transactionId, "REJECT")
 
         assertEquals(HttpStatus.OK, response.statusCode)
         assertNotNull(response.body)
@@ -137,7 +137,7 @@ class AnalystFeedbackIntegrationTest {
         val keyword = "lavagem"
 
         createAuditViaEvaluate(transactionId, keyword)
-        val response = postDecision(transactionId, "SUSPICIOUS")
+        val response = postDecision(transactionId, "APPROVE")
         assertEquals(HttpStatus.OK, response.statusCode)
 
         val decisions = jdbcTemplate.queryForList(
@@ -152,7 +152,7 @@ class AnalystFeedbackIntegrationTest {
     @Test
     @DisplayName("POST decisions with non-existent transactionId returns 404 - Req 8.4")
     fun nonExistentTransactionIdReturns404() {
-        val response = postDecision("txn-non-existent-999", "FALSE_POSITIVE")
+        val response = postDecision("txn-non-existent-999", "REJECT")
         assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
     }
 }

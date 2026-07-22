@@ -41,6 +41,15 @@ class RuleConfigurationEntity(
     @Column(name = "updated_at", nullable = false)
     val updatedAt: Instant = Instant.now(),
 
+    @Column(name = "pending_activation", nullable = false)
+    val pendingActivation: Boolean = false,
+
+    @Column(name = "activation_requested_by", length = 100)
+    val activationRequestedBy: String? = null,
+
+    @Column(name = "activation_approved_by", length = 100)
+    val activationApprovedBy: String? = null,
+
     @OneToMany(fetch = FetchType.LAZY)
     @JoinColumn(name = "configuration_id", insertable = false, updatable = false)
     val versions: List<ConfigurationVersionEntity> = emptyList()

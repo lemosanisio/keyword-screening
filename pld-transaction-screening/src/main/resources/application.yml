@@ -49,3 +49,10 @@ pld:
       initial-delay: ${PLD_OUTBOX_INITIAL_DELAY:PT5S}
       fixed-delay: ${PLD_OUTBOX_FIXED_DELAY:PT5S}
       limit: ${PLD_OUTBOX_BATCH_SIZE:50}
+    risk-profile:
+      enabled: ${PLD_RISK_PROFILE_CONSUMER_ENABLED:false}
+      queue-url: ${PLD_RISK_PROFILE_QUEUE_URL:}
+      poll-interval: ${PLD_RISK_PROFILE_POLL_INTERVAL:5000}
+
+evaluation:
+  case-trigger-mode: ${EVALUATION_CASE_TRIGGER_MODE:LEGACY}

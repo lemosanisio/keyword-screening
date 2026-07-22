@@ -31,6 +31,7 @@ import br.com.evaluation.infrastructure.SnapshotCanonicalizer
 import br.com.evaluation.infrastructure.TransactionEvaluationLock
 import br.com.evaluation.infrastructure.TransactionEvaluationRepository
 import br.com.evaluation.infrastructure.TransactionIdentityResolver
+import br.com.evaluation.infrastructure.IntakeValidator
 import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.PrefixedUlid
@@ -63,6 +64,7 @@ class RuleSetEvaluationService(
     private val transactionEvaluationRepository: TransactionEvaluationRepository,
     private val transactionEvaluationLock: TransactionEvaluationLock,
     private val domainEventPublisher: DomainEventPublisher,
+    private val intakeValidator: IntakeValidator,
 ) : EvaluateRuleSetUseCase {
 
     private val logger = LoggerFactory.getLogger(RuleSetEvaluationService::class.java)
@@ -72,6 +74,22 @@ class RuleSetEvaluationService(
         val traceId = TraceId(correlationId)
         val contractTransactionId = transactionIdentityResolver.resolve(command.sourceSystem, command.transactionId.value)
         transactionEvaluationLock.acquire("transaction", contractTransactionId, command.purpose)
+
+        // Validar intake antes de criar aggregate
+        val intakeResult = intakeValidator.validate(
+            IntakeValidator.IntakeInput(
+                sourceSystem = command.sourceSystem,
+                externalTransactionId = command.transactionId.value,
+                transactionVersion = command.transactionVersion,
+                purpose = command.purpose,
+                snapshot = evaluationSnapshot(command),
+                correlationId = correlationId,
+            )
+        )
+        if (intakeResult is IntakeValidator.IntakeResult.Quarantined) {
+            logger.warn("Intake quarantined: {}", intakeResult.reasonDetail)
+            return RuleSetEvaluationResult(null, null, null, null, null, null, emptyList())
+        }
 
         val rules = activeRules()
         if (rules.isEmpty()) {

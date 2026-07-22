@@ -68,6 +68,7 @@ class RuleConfigurationRepositoryImplTest {
         val domain = sampleDomain()
         val entity = sampleEntity()
 
+        every { jpaRepository.existsById(id) } returns false
         every { mapper.toEntity(domain) } returns entity
         every { jpaRepository.save(entity) } returns entity
         every { jpaRepository.findById(id) } returns Optional.of(entity)
@@ -87,6 +88,7 @@ class RuleConfigurationRepositoryImplTest {
         val domain = sampleDomain()
         val entity = sampleEntity()
 
+        every { jpaRepository.existsById(id) } returns false
         every { mapper.toEntity(domain) } returns entity
         every { jpaRepository.save(entity) } returns entity
         every { jpaRepository.findById(id) } returns Optional.empty()

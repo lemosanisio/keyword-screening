@@ -17,6 +17,7 @@ import br.com.decision.domain.service.RuleEngine
 import br.com.decision.domain.model.vo.FactName
 import br.com.decision.domain.model.vo.FactValue
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.util.UUID
 
@@ -29,6 +30,7 @@ import java.util.UUID
  * Funciona tanto para configurações draft quanto active.
  */
 @Service
+@Transactional
 class DryRunService(
     private val ruleConfigurationRepository: RuleConfigurationRepository,
     private val factDefinitionRepository: FactDefinitionRepository,

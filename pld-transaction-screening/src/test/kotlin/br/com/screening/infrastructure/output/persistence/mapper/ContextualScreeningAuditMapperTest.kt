@@ -63,7 +63,7 @@ class ContextualScreeningAuditMapperTest {
             ruleId = "RULE_01",
             keyword = "lavagem",
             prompt = "Check description",
-            modelResponse = "response text",
+            modelResponse = """{"raw":"response text"}""",
             llmClassification = "FALSE_POSITIVE",
             llmConfidence = 0.95,
             finalClassification = Classification.FALSE_POSITIVE,
@@ -81,7 +81,7 @@ class ContextualScreeningAuditMapperTest {
         assertEquals("RULE_01", entity.ruleId)
         assertEquals("lavagem", entity.keyword)
         assertEquals("Check description", entity.prompt)
-        assertEquals("response text", entity.modelResponse)
+        assertEquals("""{"raw":"response text"}""", entity.modelResponse)
         assertEquals("FALSE_POSITIVE", entity.llmClassification)
         assertEquals(0.95, entity.llmConfidence)
         assertEquals("FALSE_POSITIVE", entity.finalClassification)
@@ -128,7 +128,7 @@ class ContextualScreeningAuditMapperTest {
             ruleId = "CONTEXTUAL_SCREENING",
             keyword = "sancao",
             prompt = "Test prompt",
-            modelResponse = "LLM response",
+            modelResponse = """{"raw":"LLM response"}""",
             llmClassification = "SUSPICIOUS",
             llmConfidence = 0.88,
             finalClassification = Classification.SUSPICIOUS,

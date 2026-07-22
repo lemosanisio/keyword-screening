@@ -132,9 +132,45 @@ Saída: caminho real `DecisionExecution → outbox → SQS → inbox → caso` v
 
 Saída: avaliação histórica consultável sem reexecutar regras atuais e cutover humano protegido por dual-run.
 
-### Marcos posteriores — capacidades adiadas
+### Marco 8 — projeção local de risco, cutover v2 e administração de regras
 
-Onboarding real, projeção local de risco, revalidação, dossiê, comunicação ao COAF e retirada definitiva do legado permanecem no roadmap. Cada capacidade deve receber novo corte e critérios antes da implementação; a numeração original foi substituída pelos incrementos exploratórios executados nos Marcos 5 a 7.
+1. Consumir `CustomerRiskProfileUpdated.v1` (publisher mock) e manter projeção local no motor.
+2. Cutover SHADOW → MANUAL_REVIEW_LIVE — v2 como único gatilho de caso.
+3. Entregar tela de administração de regras no Workbench (catálogo, dry-run, ativação).
+4. Pesquisa global básica no shell.
+
+Saída: motor transacional desacoplado do REST de risco, Alert legado desativado, analista autônomo para configurar regras.
+
+### Marco 9 — adapters de evidência simulados e visão 360
+
+1. Implementar 4 adapters mock (bureau, sanções, processos, mídia) com latência/falha realista.
+2. Policy de evidência por risco (não mais cenários hardcoded).
+3. Visão 360 expandida (risco, segmentos, contas, endereço).
+4. Telas de mídia/processos e nomes/aliases.
+
+Saída: evidências com proveniência real (dados simulados), prontidão decisória baseada em política, visão 360 funcional.
+
+### Marco 10 — dossiê interno e comunicação COAF simulada
+
+1. Geração de dossiê a partir do caso (assíncrona, versionada, com manifesto e gaps).
+2. Workflow COAF completo: draft → aprovação → envio (adapter mock) → protocolo/rejeição.
+3. Telas de dossiê e área COAF protegida por permissão.
+
+Saída: ciclo regulatório completo simulado — do sinal à comunicação ao regulador.
+
+### Marco 11 — onboarding simulado, revalidação e relações
+
+1. Publisher mock de eventos mestre (onboarding, data change, relationships).
+2. Consumer cria parties e ciclos automaticamente.
+3. Revalidação periódica e event-driven com coalescência.
+4. Telas de relações PF/PJ, revalidação/diff entre ciclos, shell expandido.
+5. Maker-checker para ativação de regras.
+
+Saída: protótipo cobre todos os fluxos documentados de ponta a ponta com simulação.
+
+### Pós Marco 11 — produção
+
+Substituir simulações por integrações reais, conforme decisões externas (EXT-2 a EXT-8). Cada integração real é um incremento independente que substitui um adapter mock pela implementação final.
 
 ## Forma recomendada dos pull requests
 

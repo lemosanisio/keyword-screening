@@ -6,14 +6,12 @@ import br.com.decision.infrastructure.configuration.CustomerRiskProperties
 import br.com.shared.domain.valueobject.CustomerId
 import org.slf4j.LoggerFactory
 import org.springframework.http.client.SimpleClientHttpRequestFactory
-import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 
 /**
  * Adapter REST para busca de risco do cliente no sistema externo (Cadastro).
  * Retorna null em qualquer falha (timeout, erro de conexão, resposta inválida).
  */
-@Component
 class CustomerRiskAdapter(
     private val properties: CustomerRiskProperties
 ) : CustomerRiskPort {

@@ -36,6 +36,13 @@ export type PartyResponse = {
     sourceSystem: string;
     effectiveAt: string;
   };
+  riskProfile?: {
+    riskLevel: string;
+    segments: string[];
+    policyVersion: string;
+    effectiveFrom: string;
+    validUntil: string;
+  } | null;
 };
 
 export type CaseSource = {
@@ -53,6 +60,15 @@ export type CaseSource = {
   correlationId: string;
   causationId: string;
   attachedAt: string;
+  // Marco 7: avaliação reproduzível
+  purpose?: string | null;
+  executionStatus?: string | null;
+  evaluationOutcome?: string | null;
+  reviewRequired?: boolean | null;
+  snapshotHash?: string | null;
+  rulesetVersion?: string | null;
+  indeterminateFacts?: string[] | null;
+  explanation?: Array<{ code: string; detail?: string }> | null;
 };
 
 export type CaseComment = {

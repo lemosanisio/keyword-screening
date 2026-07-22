@@ -70,7 +70,7 @@ class TransactionSignalCaseIntegrationTest {
             "TRANSACTION_SIGNAL_DETECTED",
             "CASE_CREATED",
         )
-        assertThat(outboxEventTypes()).containsExactly("PartyCreated", "CaseStatusChanged")
+        assertThat(outboxEventTypes()).containsExactly("PartyCreated", "CustomerRiskProfileUpdated", "CaseStatusChanged")
 
         mockMvc.get("/v1/cases")
             .andExpect {
@@ -195,6 +195,7 @@ class TransactionSignalCaseIntegrationTest {
         )
         assertThat(outboxEventTypes()).containsExactly(
             "PartyCreated",
+            "CustomerRiskProfileUpdated",
             "CaseStatusChanged",
             "CaseStatusChanged",
             "CaseStatusChanged",
@@ -305,6 +306,7 @@ class TransactionSignalCaseIntegrationTest {
 
         assertThat(outboxEventTypes()).containsExactly(
             "PartyCreated",
+            "CustomerRiskProfileUpdated",
             "CaseStatusChanged",
             "CaseStatusChanged",
             "CaseStatusChanged",
@@ -366,6 +368,7 @@ class TransactionSignalCaseIntegrationTest {
         assertThat(timelineEntryTypes(partyId)).contains("ACCOUNT_DECISION_ISSUED")
         assertThat(outboxEventTypes()).containsExactly(
             "PartyCreated",
+            "CustomerRiskProfileUpdated",
             "CaseStatusChanged",
             "CaseStatusChanged",
             "CaseStatusChanged",
@@ -423,6 +426,7 @@ class TransactionSignalCaseIntegrationTest {
 
         assertThat(outboxEventTypes()).containsExactly(
             "PartyCreated",
+            "CustomerRiskProfileUpdated",
             "CaseStatusChanged",
             "CaseStatusChanged",
             "CaseStatusChanged",
@@ -461,6 +465,7 @@ class TransactionSignalCaseIntegrationTest {
         assertThat(timelineEntryTypes(partyId)).contains("ACCOUNT_DECISION_PENDING_APPROVAL", "ACCOUNT_DECISION_APPROVED")
         assertThat(outboxEventTypes()).containsExactly(
             "PartyCreated",
+            "CustomerRiskProfileUpdated",
             "CaseStatusChanged",
             "CaseStatusChanged",
             "CaseStatusChanged",

@@ -20,7 +20,19 @@ class RuleDefinitionRepositoryImpl(
     override fun findAll(): List<RuleDefinition> =
         jpaRepository.findAll().map { mapper.toDomain(it) }
 
-    override fun findByContextAndCategory(context: RuleContext?, category: RuleCategory?): List<RuleDefinition> =
-        jpaRepository.findByContextAndCategory(context?.name, category?.name)
-            .map { mapper.toDomain(it) }
+    override fun findByContextAndCategory(context: RuleContext?, category: RuleCategory?): List<RuleDefinition> {
+        val entities = when {
+            context == null && category == null -> jpaRepository.findAll()
+            context != null && category != null -> jpaRepository.findByContextAndCategory(context.name, category.name)
+            context != null -> jpaRepository.findByContextAndCategory(context.name, null)
+            else -> jpaRepository.findByContextAndCategory(null, category!!.name)
+        }
+        return entities.map { mapper.toDomain(it) }
+    }
+
+    override fun save(definition: RuleDefinition): RuleDefinition {
+        val entity = mapper.toEntity(definition)
+        val saved = jpaRepository.save(entity)
+        return mapper.toDomain(saved)
+    }
 }

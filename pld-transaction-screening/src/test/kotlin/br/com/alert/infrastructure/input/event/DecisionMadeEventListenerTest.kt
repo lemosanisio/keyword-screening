@@ -30,7 +30,7 @@ import br.com.shared.domain.valueobject.TraceId
 class DecisionMadeEventListenerTest {
 
     private val createAlertUseCase = mockk<CreateAlertUseCase>(relaxed = true)
-    private val listener = DecisionMadeEventListener(createAlertUseCase)
+    private val listener = DecisionMadeEventListener(createAlertUseCase, "LEGACY")
 
     @BeforeEach
     fun setUp() {

@@ -21,6 +21,8 @@ class EvidenceService(
     private val factRepository: FactVersionJpaRepository,
     private val timelineRepository: TimelineEntryJpaRepository,
     private val objectMapper: ObjectMapper,
+    private val sourceRegistry: EvidenceSourceRegistry,
+    private val evidencePolicy: EvidencePolicy,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional(readOnly = true)
@@ -82,6 +84,233 @@ class EvidenceService(
         }
 
         recordTimeline(collection, "EVIDENCE_COLLECTION_CREATED", "EVIDENCE_COLLECTION_CREATED", correlationId, now)
+        return matrix(collection)
+    }
+
+    /**
+     * Cria uma coleção de evidências usando adapters reais (simulados) com base na policy de risco.
+     * Cada adapter é executado e o resultado persistido com proveniência completa.
+     */
+    @Transactional
+    fun createCollectionFromPolicy(
+        caseId: String,
+        partyId: String,
+        analysisCycleId: String,
+        riskLevel: String,
+        correlationId: String,
+    ): EvidenceMatrixView {
+        collectionRepository.findByCaseId(caseId)?.let { return matrix(it) }
+        val now = Instant.now(clock)
+        val policyRequirements = evidencePolicy.requirementsFor(riskLevel)
+        val collection = collectionRepository.save(
+            EvidenceCollectionEntity(
+                id = PrefixedUlid.next("evc_"),
+                caseId = caseId,
+                partyId = partyId,
+                analysisCycleId = analysisCycleId,
+                scenario = EvidenceScenario.CLEAR, // policy-based, not scenario-based
+                policyVersion = evidencePolicy.policyVersion,
+                revision = 1,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+
+        policyRequirements.forEachIndexed { index, policyReq ->
+            val adapter = sourceRegistry.find(policyReq.sourceCode)
+            val result = adapter?.execute(partyId, policyReq.code, 1)
+
+            val outcome = when (result?.status) {
+                SourceExecutionStatus.SUCCESS_WITH_DATA, SourceExecutionStatus.SUCCESS_NO_RESULTS -> RequirementOutcome.SATISFIED
+                SourceExecutionStatus.PARTIAL, SourceExecutionStatus.CONFLICT -> RequirementOutcome.SATISFIED
+                SourceExecutionStatus.UNAVAILABLE, SourceExecutionStatus.ERROR -> RequirementOutcome.TECHNICAL_PENDING
+                SourceExecutionStatus.EXPIRED -> RequirementOutcome.NOT_SATISFIED
+                null -> RequirementOutcome.TECHNICAL_PENDING
+            }
+            val outcomeReason = when (result?.status) {
+                SourceExecutionStatus.SUCCESS_WITH_DATA -> "DATA_PRESENT"
+                SourceExecutionStatus.SUCCESS_NO_RESULTS -> "VALID_EMPTY_RESULT"
+                SourceExecutionStatus.PARTIAL, SourceExecutionStatus.CONFLICT -> "PARTIAL_DATA_REVIEWED"
+                SourceExecutionStatus.UNAVAILABLE -> "SOURCE_UNAVAILABLE"
+                SourceExecutionStatus.ERROR -> "SOURCE_ERROR"
+                SourceExecutionStatus.EXPIRED -> "EVIDENCE_EXPIRED"
+                null -> "ADAPTER_NOT_FOUND"
+            }
+
+            val requirement = requirementRepository.save(
+                AnalysisRequirementEntity(
+                    id = PrefixedUlid.next("req_"),
+                    evidenceCollectionId = collection.id,
+                    code = policyReq.code,
+                    title = policyReq.title,
+                    category = policyReq.category,
+                    mandatory = policyReq.mandatory,
+                    outcome = outcome,
+                    outcomeReason = outcomeReason,
+                    displayOrder = index + 1,
+                    evaluatedAt = now,
+                ),
+            )
+
+            if (result != null) {
+                val execution = executionRepository.save(
+                    SourceExecutionEntity(
+                        id = PrefixedUlid.next("sex_"),
+                        evidenceCollectionId = collection.id,
+                        requirementId = requirement.id,
+                        sourceCode = policyReq.sourceCode,
+                        sourceName = adapter?.sourceName ?: policyReq.sourceCode,
+                        attempt = 1,
+                        status = result.status,
+                        adapterVersion = "adapter-v1",
+                        startedAt = now.minusMillis(result.durationMs),
+                        completedAt = now,
+                        validUntil = result.validUntil,
+                        summary = result.summary,
+                        errorCode = result.errorCode,
+                        correlationId = correlationId,
+                    ),
+                )
+
+                result.evidence.forEach { evidenceResult ->
+                    val evidence = evidenceRepository.save(
+                        EvidenceRecordEntity(
+                            id = PrefixedUlid.next("evd_"),
+                            sourceExecutionId = execution.id,
+                            partyId = partyId,
+                            analysisCycleId = analysisCycleId,
+                            evidenceType = evidenceResult.evidenceType,
+                            title = evidenceResult.title,
+                            summary = evidenceResult.summary,
+                            observedAt = now,
+                            validUntil = result.validUntil,
+                            referenceKey = "adapter://${policyReq.sourceCode}/$caseId/1",
+                            integrityHash = "sha256:${PrefixedUlid.ulid()}",
+                            classification = evidenceResult.classification,
+                            structuredData = objectMapper.writeValueAsString(evidenceResult.structuredData),
+                        ),
+                    )
+                    evidenceResult.facts.forEach { fact ->
+                        factRepository.save(
+                            FactVersionEntity(
+                                id = PrefixedUlid.next("fac_"),
+                                evidenceId = evidence.id,
+                                partyId = partyId,
+                                analysisCycleId = analysisCycleId,
+                                factCode = fact.code,
+                                label = fact.label,
+                                value = objectMapper.writeValueAsString(fact.value),
+                                quality = fact.quality,
+                                observedAt = now,
+                                validUntil = result.validUntil,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        recordTimeline(collection, "EVIDENCE_COLLECTION_CREATED", "EVIDENCE_COLLECTION_POLICY_BASED", correlationId, now)
+        return matrix(collection)
+    }
+
+    @Transactional
+    fun retryRequirementWithAdapter(caseId: String, requirementId: String, expectedRevision: Int, correlationId: String): EvidenceMatrixView {
+        val collection = collectionRepository.findByCaseId(caseId) ?: throw EvidenceCollectionNotFoundException(caseId)
+        if (collection.revision != expectedRevision) throw EvidenceRevisionConflictException(collection.revision, expectedRevision)
+        val requirement = requirementRepository.findByIdAndEvidenceCollectionId(requirementId, collection.id)
+            ?: throw RequirementNotFoundException(requirementId)
+        val executions = executionRepository.findByRequirementIdOrderByAttemptAsc(requirement.id)
+        val last = executions.lastOrNull() ?: throw RequirementNotFoundException(requirementId)
+        if (last.status != SourceExecutionStatus.UNAVAILABLE && last.status != SourceExecutionStatus.ERROR) {
+            throw RequirementRetryNotAllowedException(requirementId)
+        }
+
+        val adapter = sourceRegistry.find(last.sourceCode)
+        val now = Instant.now(clock)
+        val result = adapter?.execute(collection.partyId, requirement.code, last.attempt + 1)
+
+        if (result != null && result.status != SourceExecutionStatus.UNAVAILABLE && result.status != SourceExecutionStatus.ERROR) {
+            val execution = executionRepository.save(
+                SourceExecutionEntity(
+                    id = PrefixedUlid.next("sex_"),
+                    evidenceCollectionId = collection.id,
+                    requirementId = requirement.id,
+                    sourceCode = last.sourceCode,
+                    sourceName = adapter?.sourceName ?: last.sourceCode,
+                    attempt = last.attempt + 1,
+                    status = result.status,
+                    adapterVersion = "adapter-v1",
+                    startedAt = now.minusMillis(result.durationMs),
+                    completedAt = now,
+                    validUntil = result.validUntil,
+                    summary = result.summary,
+                    errorCode = null,
+                    correlationId = correlationId,
+                ),
+            )
+            result.evidence.forEach { evidenceResult ->
+                val evidence = evidenceRepository.save(
+                    EvidenceRecordEntity(
+                        id = PrefixedUlid.next("evd_"),
+                        sourceExecutionId = execution.id,
+                        partyId = collection.partyId,
+                        analysisCycleId = collection.analysisCycleId,
+                        evidenceType = evidenceResult.evidenceType,
+                        title = evidenceResult.title,
+                        summary = evidenceResult.summary,
+                        observedAt = now,
+                        validUntil = result.validUntil,
+                        referenceKey = "adapter://${last.sourceCode}/${caseId}/${last.attempt + 1}",
+                        integrityHash = "sha256:${PrefixedUlid.ulid()}",
+                        classification = evidenceResult.classification,
+                        structuredData = objectMapper.writeValueAsString(evidenceResult.structuredData),
+                    ),
+                )
+                evidenceResult.facts.forEach { fact ->
+                    factRepository.save(
+                        FactVersionEntity(
+                            id = PrefixedUlid.next("fac_"),
+                            evidenceId = evidence.id,
+                            partyId = collection.partyId,
+                            analysisCycleId = collection.analysisCycleId,
+                            factCode = fact.code,
+                            label = fact.label,
+                            value = objectMapper.writeValueAsString(fact.value),
+                            quality = fact.quality,
+                            observedAt = now,
+                            validUntil = result.validUntil,
+                        ),
+                    )
+                }
+            }
+            requirement.outcome = RequirementOutcome.SATISFIED
+            requirement.outcomeReason = "RETRY_SUCCESSFUL"
+            requirement.evaluatedAt = now
+        } else if (result != null) {
+            executionRepository.save(
+                SourceExecutionEntity(
+                    id = PrefixedUlid.next("sex_"),
+                    evidenceCollectionId = collection.id,
+                    requirementId = requirement.id,
+                    sourceCode = last.sourceCode,
+                    sourceName = adapter?.sourceName ?: last.sourceCode,
+                    attempt = last.attempt + 1,
+                    status = result.status,
+                    adapterVersion = "adapter-v1",
+                    startedAt = now.minusMillis(result.durationMs),
+                    completedAt = now,
+                    validUntil = null,
+                    summary = result.summary,
+                    errorCode = result.errorCode,
+                    correlationId = correlationId,
+                ),
+            )
+        }
+
+        collection.revision += 1
+        collection.updatedAt = now
+        recordTimeline(collection, "SOURCE_EXECUTION_RETRIED", "RETRY_${requirement.code}", correlationId, now)
         return matrix(collection)
     }
 

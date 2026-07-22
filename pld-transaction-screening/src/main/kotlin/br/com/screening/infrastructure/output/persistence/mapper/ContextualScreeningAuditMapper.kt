@@ -34,7 +34,7 @@ class ContextualScreeningAuditMapper {
             ruleId = domain.ruleId,
             keyword = domain.keyword,
             prompt = domain.prompt,
-            modelResponse = domain.modelResponse,
+            modelResponse = sanitizeJsonb(domain.modelResponse),
             llmClassification = domain.llmClassification,
             llmConfidence = domain.llmConfidence,
             finalClassification = domain.finalClassification.name,
@@ -44,4 +44,17 @@ class ContextualScreeningAuditMapper {
             analystDecision = domain.analystDecision?.name,
             createdAt = domain.createdAt
         )
+
+    /**
+     * Garante que o valor persistido em coluna JSONB seja JSON válido.
+     * Se o valor original não inicia com '{' ou '[', encapsula como objeto JSON com campo "message".
+     */
+    private fun sanitizeJsonb(value: String?): String? {
+        if (value == null) return null
+        val trimmed = value.trimStart()
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return value
+        return """{"message":${com.fasterxml.jackson.core.io.JsonStringEncoder.getInstance().let { encoder ->
+            "\"${String(encoder.quoteAsString(value))}\""
+        }}}"""
+    }
 }
