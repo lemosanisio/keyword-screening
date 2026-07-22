@@ -68,12 +68,15 @@ class KeywordScreeningServicePropertyTest {
             result
         }
 
+        val intakeGuard = mockk<ScreeningIntakeGuard>()
+        every { intakeGuard.register(any(), any(), any()) } returns "01J6ZK7Q3W8K0M2N4P6R8T0V6A"
         val service = KeywordScreeningService(
             textNormalizer = textNormalizer,
             keywordMatcher = keywordMatcher,
             restrictedTermsCache = restrictedTermsCache,
             idempotencyService = idempotencyService,
-            domainEventPublisher = domainEventPublisher
+            domainEventPublisher = domainEventPublisher,
+            screeningIntakeGuard = intakeGuard,
         )
 
         val command = EvaluateKeywordScreeningCommand(transactionId, CustomerId("CUST-PBT"), description)

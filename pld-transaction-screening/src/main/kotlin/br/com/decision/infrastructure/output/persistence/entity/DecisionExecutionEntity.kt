@@ -25,6 +25,10 @@ class DecisionExecutionEntity(
     @Column(name = "facts", columnDefinition = "jsonb", nullable = false)
     val facts: Map<String, Any?> = emptyMap(),
 
+    @Type(JsonType::class)
+    @Column(name = "fact_results", columnDefinition = "jsonb", nullable = false)
+    val factResults: List<Map<String, Any?>> = emptyList(),
+
     @Column(name = "decision", nullable = false, length = 50)
     val decision: String = "",
 
@@ -61,6 +65,18 @@ class DecisionExecutionEntity(
 
     @Column(name = "causation_id", length = 128)
     val causationId: String? = null,
+
+    @Column(name = "evaluation_status", nullable = false)
+    val evaluationStatus: String = "COMPLETED",
+
+    @Column(name = "evaluation_outcome", nullable = false)
+    val evaluationOutcome: String = "NO_SIGNAL",
+
+    @Column(name = "review_required", nullable = false)
+    val reviewRequired: Boolean = false,
+
+    @Column(name = "recommended_route")
+    val recommendedRoute: String? = null,
 
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now()

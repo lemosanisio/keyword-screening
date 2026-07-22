@@ -2,6 +2,7 @@ package br.com.decision.domain.service
 
 import br.com.decision.domain.model.Condition
 import br.com.decision.domain.model.ExpressionEvaluation
+import br.com.decision.domain.model.ExpressionOutcome
 import br.com.decision.domain.model.Group
 import br.com.decision.domain.model.LogicalOperator
 import br.com.decision.domain.model.enums.ComparisonOperator
@@ -291,6 +292,7 @@ class ExpressionEvaluatorTest {
             val result = evaluator.evaluate(condition, facts)
 
             assertThat(result.satisfied).isFalse()
+            assertThat(result.outcome).isEqualTo(ExpressionOutcome.INDETERMINATE)
             assertThat(result.actualValue).isNull()
             assertThat(result.justification).isEqualTo("Fact 'keywordMatched' ausente no contexto")
         }
@@ -307,6 +309,7 @@ class ExpressionEvaluatorTest {
             val result = evaluator.evaluate(condition, facts)
 
             assertThat(result.satisfied).isFalse()
+            assertThat(result.outcome).isEqualTo(ExpressionOutcome.INDETERMINATE)
             assertThat(result.actualValue).isNull()
             assertThat(result.justification).contains("ausente no contexto")
         }

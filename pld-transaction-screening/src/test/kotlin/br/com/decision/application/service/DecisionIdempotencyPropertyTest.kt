@@ -30,6 +30,11 @@ import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.CustomerId
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
+import br.com.evaluation.infrastructure.CanonicalSnapshot
+import br.com.evaluation.infrastructure.SnapshotCanonicalizer
+import br.com.evaluation.infrastructure.TransactionEvaluationRepository
+import br.com.evaluation.infrastructure.TransactionIdentityResolver
+import br.com.evaluation.infrastructure.TransactionEvaluationLock
 import io.mockk.Runs
 import io.mockk.clearMocks
 import io.mockk.every
@@ -64,13 +69,27 @@ class DecisionIdempotencyPropertyTest {
     private val ruleDefinitionRepository = mockk<RuleDefinitionRepository>()
     private val ruleConfigurationRepository = mockk<RuleConfigurationRepository>()
     private val domainEventPublisher = mockk<DomainEventPublisher>()
+    private val transactionIdentityResolver = mockk<TransactionIdentityResolver>()
+    private val snapshotCanonicalizer = mockk<SnapshotCanonicalizer>()
+    private val transactionEvaluationRepository = mockk<TransactionEvaluationRepository>(relaxed = true)
+    private val transactionEvaluationLock = mockk<TransactionEvaluationLock>(relaxed = true)
+
+    init {
+        every { transactionIdentityResolver.resolve(any(), any()) } answers { secondArg() }
+        every { snapshotCanonicalizer.canonicalize(any()) } returns CanonicalSnapshot("{}", "0".repeat(64))
+        every { transactionEvaluationRepository.findDecisionExecutionId(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns null
+    }
 
     private val decisionService = DecisionService(
         decisionEngine = decisionEngine,
         decisionExecutionRepository = decisionExecutionRepository,
         ruleDefinitionRepository = ruleDefinitionRepository,
         ruleConfigurationRepository = ruleConfigurationRepository,
-        domainEventPublisher = domainEventPublisher
+        domainEventPublisher = domainEventPublisher,
+        transactionIdentityResolver = transactionIdentityResolver,
+        snapshotCanonicalizer = snapshotCanonicalizer,
+        transactionEvaluationRepository = transactionEvaluationRepository,
+        transactionEvaluationLock = transactionEvaluationLock,
     )
 
     // --- Random generators ---
@@ -230,6 +249,10 @@ class DecisionIdempotencyPropertyTest {
             savedExecution = exec
             exec
         }
+        every { transactionEvaluationRepository.findDecisionExecutionId(any(), any(), any(), any(), any(), any(), any(), any(), any()) } answers {
+            savedExecution?.id
+        }
+        every { decisionExecutionRepository.findById(any()) } answers { savedExecution }
         every { domainEventPublisher.publish(any()) } just Runs
 
         val command = buildCommand(transactionId, customerId, ruleCode, matched)

@@ -2,6 +2,7 @@ package br.com.decision.domain.service
 
 import br.com.decision.domain.model.Expression
 import br.com.decision.domain.model.ExpressionEvaluation
+import br.com.decision.domain.model.ExpressionOutcome
 import br.com.decision.domain.model.vo.FactName
 import br.com.decision.domain.model.vo.FactValue
 
@@ -27,10 +28,16 @@ class RuleEngine(
             expressionEvaluator.evaluate(expression, facts)
         }
 
-        val allSatisfied = evaluations.isNotEmpty() && evaluations.all { it.satisfied }
+        val outcome = when {
+            evaluations.isEmpty() -> RuleEvaluationOutcome.FALSE
+            evaluations.any { it.outcome == ExpressionOutcome.FALSE } -> RuleEvaluationOutcome.FALSE
+            evaluations.any { it.outcome == ExpressionOutcome.INDETERMINATE } -> RuleEvaluationOutcome.INDETERMINATE
+            else -> RuleEvaluationOutcome.TRUE
+        }
 
         return RuleEvaluationResult(
-            allSatisfied = allSatisfied,
+            allSatisfied = outcome == RuleEvaluationOutcome.TRUE,
+            outcome = outcome,
             evaluations = evaluations
         )
     }
@@ -38,5 +45,8 @@ class RuleEngine(
 
 data class RuleEvaluationResult(
     val allSatisfied: Boolean,
-    val evaluations: List<ExpressionEvaluation>
+    val evaluations: List<ExpressionEvaluation>,
+    val outcome: RuleEvaluationOutcome = if (allSatisfied) RuleEvaluationOutcome.TRUE else RuleEvaluationOutcome.FALSE,
 )
+
+enum class RuleEvaluationOutcome { TRUE, FALSE, INDETERMINATE }

@@ -24,6 +24,7 @@ class DecisionMadeEventListener(
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handle(event: DecisionMadeEvent) {
+        if (event.evaluation?.purpose?.let { it != "LIVE" } == true) return
         if (Action.GENERATE_ALERT in event.actions) {
             log.info(
                 "Processando DecisionMadeEvent GENERATE_ALERT: transactionId={}, ruleId={}, traceId={}",

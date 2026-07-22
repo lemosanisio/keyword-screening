@@ -56,6 +56,8 @@ Registrar cada escolha material em ADR. Não introduzir acoplamento de domínio 
 
 ## Sequência de trabalho
 
+Esta sequência reflete os incrementos efetivamente executados. Ela substitui o roadmap nominal inicial quando houver divergência com os arquivos `marco-*-tasks.md` e ADRs posteriores.
+
 ### Marco 0 — contrato e segurança de mudança
 
 1. Adicionar estes documentos ao workspace.
@@ -76,26 +78,23 @@ Saída: contratos testáveis, sem alteração de comportamento em produção.
 
 Saída: fatia vertical autenticada, auditável e implantável.
 
-### Marco 2 — desacoplamento do motor transacional
+### Marco 2 — caso transacional mínimo
 
-1. Introduzir `evaluationId` e envelope comum.
-2. Persistir snapshot de entrada, versão de regra/política, fatos usados e fatos ausentes.
-3. Introduzir valor de fato com `PRESENT`, `UNKNOWN`, `STALE` e `ERROR`.
-4. Criar projeção local de risco atualizada por `CustomerRiskProfileUpdated.v1`.
-5. Publicar `TransactionEvaluationCompleted.v1`, `TransactionSignalDetected.v1` e `ManualReviewRequested.v1` via outbox.
-6. Manter o workflow de `Alert` antigo temporariamente, marcado como legado.
+1. Criar o aggregate `Case` e sua fila humana no backend de clientes.
+2. Consumir sinais transacionais com inbox idempotente.
+3. Abrir e consultar casos sem duplicidade.
+4. Projetar origem, sinal e contexto mínimo para a fila.
 
-Saída: transações avaliadas sem dependência síncrona do novo backend.
+Saída: sinal transacional recebido e transformado em caso humano consultável.
 
-### Marco 3 — caso transacional no backend de clientes
+### Marco 3 — colaboração e decisão humana
 
-1. Consumir eventos transacionais com inbox.
-2. Agrupar sinais conforme política e abrir/atualizar caso sem duplicidade.
-3. Projetar transações, regras acionadas e explicações na visão do cliente.
-4. Implementar atribuição, comentário, pedido de informação e decisões humanas.
-5. Emitir `CaseStatusChanged.v1` e, quando aplicável, comandos/feedback explicitamente contratados.
+1. Registrar comentários e anotações no caso com timeline.
+2. Implementar decisões mínimas de suspeição e relacionamento.
+3. Publicar os eventos v1 dessas decisões.
+4. Exigir revisão humana secundária para decisões sensíveis.
 
-Saída: o analista já não precisa operar a fila humana no motor.
+Saída: colaboração e decisões humanas mínimas, auditáveis e separadas por finalidade.
 
 ### Marco 4 — primeira versão do React
 
@@ -106,32 +105,36 @@ Saída: o analista já não precisa operar a fila humana no motor.
 
 Saída: fluxo completo de um caso transacional até decisão, com trilha de auditoria.
 
-### Marco 5 — onboarding, evidências e revalidação
+### Marco 5 — evidências simuladas e prontidão decisória
 
-1. Ingerir dados cadastrais e relações PF/PJ.
-2. Conectar fontes por adaptadores, preservando proveniência e status de execução.
-3. Implementar assessment, deriva, decisão de relacionamento e agendamento de revalidação.
-4. Integrar Street View apenas como observação de analista e conforme políticas do Google.
+1. Simular execução de fontes preservando proveniência, qualidade e tentativas.
+2. Exibir matriz de evidências e prontidão decisória no Workbench.
+3. Implementar retry e conclusão explícita do ciclo.
+4. Validar decisões e segunda aprovação sobre evidências persistidas.
 
-Saída: análise ponta a ponta de onboarding e revisão contínua.
+Saída: fluxo humano auditável com estados de evidência e prontidão explícitos.
 
-### Marco 6 — dossiê e COAF
+### Marco 6 — integração transacional real
 
-1. Gerar snapshot versionado do dossiê a partir de fatos e decisões já persistidos.
-2. Criar comunicação COAF separada, com revisão, aprovação, envio por porta e comprovante.
-3. Aplicar controles de acesso, segredo e não comunicação ao cliente.
-4. Testar retificação, falha de envio, reprocessamento e reconstrução histórica.
+1. Persistir screening, decisão e outbox na mesma transação no motor transacional.
+2. Publicar `TransactionSignalDetected.v1` via SQS com entrega at-least-once.
+3. Consumir com inbox idempotente e abrir caso sem duplicidade.
+4. Preservar o workflow de `Alert` legado durante a convivência.
 
-Saída: processo regulatório rastreável de ponta a ponta.
+Saída: caminho real `DecisionExecution → outbox → SQS → inbox → caso` validado ponta a ponta.
 
-### Marco 7 — retirada do legado
+### Marco 7 — avaliação transacional reproduzível
 
-1. Comparar por período os casos gerados nos dois caminhos.
-2. Migrar links/bookmarks e permissões do backoffice anterior.
-3. Bloquear novas decisões humanas no módulo `Alert` legado.
-4. Remover consumidores/APIs apenas após confirmar que não há dependências.
+1. Introduzir o aggregate imutável `TransactionEvaluation`, snapshot canônico e facts tri-state.
+2. Congelar ruleset e explicação usados em cada avaliação.
+3. Publicar `TransactionEvaluationCompleted.v2`, sinais v1 e `ManualReviewRequested.v2` via outbox.
+4. Projetar pedidos e sinais tolerando duplicidade e reorder antes de trocar o gatilho do caso.
 
-Saída: uma fila humana e nenhuma duplicidade de trabalho.
+Saída: avaliação histórica consultável sem reexecutar regras atuais e cutover humano protegido por dual-run.
+
+### Marcos posteriores — capacidades adiadas
+
+Onboarding real, projeção local de risco, revalidação, dossiê, comunicação ao COAF e retirada definitiva do legado permanecem no roadmap. Cada capacidade deve receber novo corte e critérios antes da implementação; a numeração original foi substituída pelos incrementos exploratórios executados nos Marcos 5 a 7.
 
 ## Forma recomendada dos pull requests
 

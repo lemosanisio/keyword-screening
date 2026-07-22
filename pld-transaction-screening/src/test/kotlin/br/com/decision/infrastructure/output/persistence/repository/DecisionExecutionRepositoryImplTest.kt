@@ -118,7 +118,7 @@ class DecisionExecutionRepositoryImplTest {
         val entity = sampleEntity()
         val domain = sampleDomain()
 
-        every { jpaRepository.findByTransactionIdAndRuleId("TX-001", ruleId) } returns entity
+        every { jpaRepository.findTopByTransactionIdAndRuleIdOrderByCreatedAtDesc("TX-001", ruleId) } returns entity
         every { mapper.toDomain(entity) } returns domain
 
         val result = repository.findByTransactionIdAndRuleId(TransactionId("TX-001"), RuleId(ruleId))
@@ -129,7 +129,7 @@ class DecisionExecutionRepositoryImplTest {
     @Test
     @DisplayName("findByTransactionIdAndRuleId returns null when not found")
     fun findByTransactionIdAndRuleIdReturnsNull() {
-        every { jpaRepository.findByTransactionIdAndRuleId("TX-001", ruleId) } returns null
+        every { jpaRepository.findTopByTransactionIdAndRuleIdOrderByCreatedAtDesc("TX-001", ruleId) } returns null
 
         val result = repository.findByTransactionIdAndRuleId(TransactionId("TX-001"), RuleId(ruleId))
 

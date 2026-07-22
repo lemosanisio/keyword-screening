@@ -1,8 +1,8 @@
 # Contratos de integração entre serviços
 
-Status: proposta de contrato lógico `v1`. A serialização final pode ser JSON, Avro ou Protobuf segundo a plataforma do time, desde que preserve a semântica.
+Status: catálogo de contratos versionados. A serialização normativa é JSON + JSON Schema.
 
-> **Serialização normativa:** JSON + JSON Schema (ADR-005). Os schemas versionados e fixtures douradas vivem em [`../schemas/v1/`](../schemas/v1/) e são a fonte executável deste contrato — este documento descreve a semântica; o catálogo é a forma. Não manter cópias divergentes de payload entre os dois.
+> **Serialização normativa:** JSON + JSON Schema (ADR-005). Os schemas versionados e fixtures douradas vivem no catálogo [`../schemas/v1/`](../schemas/v1/) e são a fonte executável deste contrato — este documento descreve a semântica; o catálogo é a forma. Durante a convivência, esse pacote contém arquivos de eventos v1 e v2; `eventVersion` e `title`, não o diretório, identificam a versão do evento. Não manter cópias divergentes de payload entre os dois.
 
 ## Princípios
 
@@ -121,19 +121,26 @@ Somente fatos necessários a regras transacionais são publicados. Evidências c
 
 ### `TransactionEvaluationCompleted.v1`
 
-Publicado para toda execução concluída ou para armazenamento analítico conforme política de volume.
+Proposta original preservada por compatibilidade. Não recebe os novos campos obrigatórios nem a semântica tri-state. O produtor reproduzível usa v2.
+
+### `TransactionEvaluationCompleted.v2`
+
+Publicado como um único evento lógico para toda avaliação `LIVE` depois que intake, snapshot e ruleset foram congelados. Entregas físicas podem se repetir com o mesmo `eventId`.
 
 Payload essencial:
 
-- `evaluationId`, `transactionId` e versão do evento de entrada;
+- `evaluationId`, `transactionId`, `inputEventId`, versão do schema de entrada e versão de negócio da transação;
+- finalidade `LIVE`;
 - `evaluatedAt`;
-- snapshot/reference da transação;
+- referência, formato e hash SHA-256 do snapshot canônico;
 - versão do catálogo/configuração de regras;
-- versão do perfil de risco local usado;
+- contexto de risco com origem e qualidade; versão é opcional durante a transição do REST legado;
 - IDs/códigos e versões das regras executadas/acionadas;
-- fatos relevantes, qualidade e lista de fatos ausentes;
-- decisão técnica e explicação estruturada;
+- fatos relevantes, qualidade, reason codes e lista de fatos indeterminados;
+- resultado de detecção, necessidade de revisão, rota e explicação estruturada;
 - latência e status da execução sem dados secretos.
+
+Estados de execução: `COMPLETED`, `INDETERMINATE` ou `FAILED`. `INDETERMINATE` é uma conclusão com lacunas tratadas pela política; não equivale a falha técnica. `evaluationOutcome` (`NO_SIGNAL` ou `SIGNAL_RAISED`) e `reviewRequired` são dimensões independentes. Falha exige estágio e código.
 
 ### `TransactionSignalDetected.v1`
 
@@ -154,7 +161,11 @@ Payload essencial:
 
 ### `ManualReviewRequested.v1`
 
-Publicado quando regra/política exige trabalho humano. `pld-customer-analysis` é dono da deduplicação — chave `(sourceSystem, sourceRequestId, groupingPolicyVersion)`, onde `sourceRequestId` = `reviewRequestId` — e do caso.
+Proposta original preservada por compatibilidade, com deduplicação histórica por `(sourceSystem, sourceRequestId, groupingPolicyVersion)`.
+
+### `ManualReviewRequested.v2`
+
+Publicado quando uma avaliação `LIVE` exige trabalho humano. Existe no máximo um pedido por `evaluationId`. `pld-customer-analysis` deduplica por `(sourceSystem, sourceRequestId)`, onde `sourceRequestId = reviewRequestId`; a política local aplicada é metadado de agrupamento e não identidade do pedido.
 
 Payload essencial:
 
@@ -172,12 +183,14 @@ Payload essencial:
 - `reasonCodes` usa o vocabulário fechado de motivos de deriva do glossário.
 - Sem `severity`/`priority`: prioridade é calculada pelo consumidor conforme política; a explicação detalhada vive nos sinais/avaliação referenciados.
 - `recommendedRoute` distingue revisão de analista (`DERIVED_TO_ANALYST`) de segunda aprovação (`MANDATORY_SECOND_APPROVAL`).
+- `signalIds` é autoritativo e pode ser vazio para revisão causada por indeterminação. Não anexar todos os sinais apenas por compartilharem `evaluationId`.
+- Para eventos desta plataforma, `sourceSystem` da chave de deduplicação é o `producer` do envelope.
 
 ### Outros eventos
 
 | Evento | Quando ocorre | Observação |
 |---|---|---|
-| `ManualReviewRequested.v1` | regra/política requer caso humano | ver seção própria acima |
+| `ManualReviewRequested.v2` | avaliação `LIVE` requer caso humano | ver seção própria acima |
 | `TransactionDecisionExecutionCompleted.v1` | uma ação técnica foi tentada/aplicada | distingue `REQUESTED`, `APPLIED`, `FAILED`, `REVERSED` |
 | `RuleConfigurationActivated.v1` | nova configuração entra em vigor | útil para auditoria/monitoramento, sem distribuir lógica |
 
@@ -186,9 +199,13 @@ Payload essencial:
 | Operação | Chave recomendada |
 |---|---|
 | consumir evento | `(consumerName, eventId)` |
-| avaliar transação | `(transactionId, transactionEventVersion, rulesetVersion, evaluationPurpose)` ou `evaluationId` fornecido pela origem |
+| deduplicar entrega de entrada | `(consumerName, inputEventId)` |
+| avaliar transação `LIVE` | chave natural única `(transactionId, transactionVersion, rulesetVersion, evaluationPurpose)`; `evaluationId` é surrogate estável e não pode apontar para outra chave |
+| executar `REPLAY`, `BACKTEST`, `DRY_RUN` ou `INVESTIGATION` | `(evaluationRequestId, evaluationPurpose)`; novo request ID cria execução intencional distinta e retry preserva o ID |
 | criar sinal | `(evaluationId, ruleCode, ruleVersion, signalType)` |
-| abrir caso a partir de pedido | `(sourceSystem, sourceRequestId, groupingPolicyVersion)` |
+| deduplicar pedido de revisão v1 | `(sourceSystem, sourceRequestId, groupingPolicyVersion)` |
+| deduplicar pedido de revisão v2 | `(sourceSystem, sourceRequestId)` |
+| agrupar pedido em caso | política local versionada; persistir `groupingPolicyVersion` aplicada |
 | aplicar comando em conta | `commandId` imutável |
 | enviar comunicação COAF | `(communicationId, submissionVersion, attemptId)`; retentativa técnica não cria nova comunicação |
 

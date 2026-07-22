@@ -15,8 +15,10 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Service
+import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Clock
 import java.time.Instant
+import java.sql.Timestamp
 
 @Service
 class TransactionSignalConsumer(
@@ -27,6 +29,7 @@ class TransactionSignalConsumer(
     private val objectMapper: ObjectMapper,
     private val meterRegistry: MeterRegistry,
     private val properties: TransactionSignalProperties,
+    private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     fun consume(eventJson: String): InboxProcessingResult {
@@ -50,7 +53,25 @@ class TransactionSignalConsumer(
             throw PartyNotFoundException(event.partyId)
         }
 
-        timelineRepository.save(
+        val inserted = jdbcTemplate.update(
+            """
+                INSERT INTO transaction_signal_projection (
+                    source_system, signal_id, event_id, evaluation_id, party_id, transaction_id,
+                    payload, occurred_at, received_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
+                ON CONFLICT (source_system, signal_id) DO NOTHING
+            """.trimIndent(),
+            properties.acceptedProducer,
+            event.signalId,
+            event.eventId,
+            event.evaluationId,
+            event.partyId,
+            event.transactionId,
+            objectMapper.writeValueAsString(event),
+            Timestamp.from(event.occurredAt),
+            Timestamp.from(Instant.now(clock)),
+        )
+        if (inserted == 1) timelineRepository.save(
             TimelineEntryEntity(
                 id = PrefixedUlid.next("tml_"),
                 partyId = event.partyId,
@@ -69,38 +90,93 @@ class TransactionSignalConsumer(
                 visibilityClassification = VisibilityClassification.CONFIDENTIAL,
             ),
         )
-        meterRegistry.counter("pld.transaction.signals.consumed", "severity", event.severity).increment()
+        if (inserted == 1) meterRegistry.counter("pld.transaction.signals.consumed", "severity", event.severity).increment()
+
+        if (properties.caseTriggerMode == CaseTriggerMode.MANUAL_REVIEW_LIVE) {
+            acquireAssociationLock(properties.acceptedProducer, event.signalId)
+        }
 
         if (
-            properties.caseCreationEnabled &&
+            inserted == 1 && properties.caseCreationEnabled &&
+            properties.caseTriggerMode != CaseTriggerMode.MANUAL_REVIEW_LIVE &&
             (event.recommendedRoute == "DERIVED_TO_ANALYST" || event.recommendedRoute == "MANDATORY_SECOND_APPROVAL")
         ) {
-            caseService.recordTransactionSignal(
-                RecordTransactionSignalCaseCommand(
-                    partyId = event.partyId,
-                    analysisCycleId = event.analysisCycleId,
-                    signalId = event.signalId,
-                    eventId = event.eventId,
-                    sourceSystem = "pld-transaction-screening",
-                    severity = event.severity,
-                    recommendedRoute = event.recommendedRoute,
-                    evaluationId = event.evaluationId,
-                    transactionId = event.transactionId,
-                    signalType = event.signalType,
-                    riskProfileVersion = event.riskProfileVersion,
-                    ruleMatches = event.ruleMatches.map {
-                        br.com.pld.customeranalysis.casemanagement.RuleMatchView(
-                            ruleCode = it.ruleCode,
-                            ruleVersion = it.ruleVersion,
-                            explanationCode = it.explanationCode,
-                        )
-                    },
-                    reasonCode = "TRANSACTION_SIGNAL_${event.severity}",
-                    occurredAt = event.occurredAt,
-                    correlationId = event.correlationId,
-                ),
-            )
+            recordCaseSource(event)
+        } else if (properties.caseCreationEnabled && properties.caseTriggerMode == CaseTriggerMode.MANUAL_REVIEW_LIVE) {
+            val request = jdbcTemplate.queryForList(
+                """
+                    SELECT case_id, party_id, evaluation_id, transaction_id FROM manual_review_request
+                    WHERE source_system = ? AND signal_ids @> ?::jsonb
+                      AND effect_status = 'CASE_EFFECT_APPLIED' AND case_id IS NOT NULL
+                    ORDER BY received_at
+                    LIMIT 1
+                """.trimIndent(),
+                properties.acceptedProducer,
+                objectMapper.writeValueAsString(listOf(event.signalId)),
+            ).firstOrNull()
+            if (request != null) {
+                require(request["party_id"] == event.partyId) { "review signal party mismatch" }
+                require(request["evaluation_id"] == event.evaluationId) { "review signal evaluation mismatch" }
+                require(request["transaction_id"] == event.transactionId) { "review signal transaction mismatch" }
+                recordCaseSource(event, request["case_id"] as String)
+                jdbcTemplate.update(
+                    """
+                        UPDATE manual_review_request r
+                        SET association_complete = TRUE
+                        WHERE source_system = ? AND signal_ids @> ?::jsonb
+                          AND effect_status = 'CASE_EFFECT_APPLIED'
+                          AND NOT EXISTS (
+                              SELECT 1 FROM jsonb_array_elements_text(r.signal_ids) signal
+                              WHERE NOT EXISTS (
+                                  SELECT 1 FROM case_source source
+                                    WHERE source.source_system = r.source_system
+                                      AND source.source_id = signal.value
+                                      AND source.case_id = r.case_id
+                              )
+                          )
+                    """.trimIndent(),
+                    properties.acceptedProducer,
+                    objectMapper.writeValueAsString(listOf(event.signalId)),
+                )
+            }
         }
+    }
+
+    private fun recordCaseSource(event: TransactionSignalEvent, targetCaseId: String? = null) {
+        caseService.recordTransactionSignal(
+            RecordTransactionSignalCaseCommand(
+                partyId = event.partyId,
+                analysisCycleId = event.analysisCycleId,
+                signalId = event.signalId,
+                eventId = event.eventId,
+                sourceSystem = properties.acceptedProducer,
+                severity = event.severity,
+                recommendedRoute = event.recommendedRoute,
+                evaluationId = event.evaluationId,
+                transactionId = event.transactionId,
+                signalType = event.signalType,
+                riskProfileVersion = event.riskProfileVersion,
+                ruleMatches = event.ruleMatches.map {
+                    br.com.pld.customeranalysis.casemanagement.RuleMatchView(
+                        ruleCode = it.ruleCode,
+                        ruleVersion = it.ruleVersion,
+                        explanationCode = it.explanationCode,
+                    )
+                },
+                reasonCode = "TRANSACTION_SIGNAL_${event.severity}",
+                occurredAt = event.occurredAt,
+                correlationId = event.correlationId,
+                targetCaseId = targetCaseId,
+            ),
+        )
+    }
+
+    private fun acquireAssociationLock(sourceSystem: String, signalId: String) {
+        jdbcTemplate.queryForObject(
+            "SELECT pg_advisory_xact_lock(hashtext(?)) IS NULL",
+            Boolean::class.java,
+            "$sourceSystem:$signalId",
+        )
     }
 
     private fun JsonNode.toTransactionSignalEvent(): TransactionSignalEvent {
@@ -199,7 +275,7 @@ class TransactionSignalConsumer(
     }
 }
 
-private data class TransactionSignalEvent(
+internal data class TransactionSignalEvent(
     val eventId: String,
     val eventType: String,
     val eventVersion: Int,
@@ -219,7 +295,7 @@ private data class TransactionSignalEvent(
     val ruleMatches: List<TransactionRuleMatch>,
 )
 
-private data class TransactionRuleMatch(
+internal data class TransactionRuleMatch(
     val ruleCode: String,
     val ruleVersion: Int,
     val explanationCode: String?,

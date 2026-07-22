@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "pld.integration.transaction-signals")
 data class TransactionSignalProperties(
     val enabled: Boolean = false,
+    val operationalEventsEnabled: Boolean = true,
     val queueUrl: String = "",
 )
 

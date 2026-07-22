@@ -177,6 +177,7 @@ class RuleEngineTest {
             val result = ruleEngine.evaluate(facts, expressions)
 
             assertThat(result.allSatisfied).isFalse()
+            assertThat(result.outcome).isEqualTo(RuleEvaluationOutcome.INDETERMINATE)
             assertThat(result.evaluations[0].satisfied).isTrue()
             assertThat(result.evaluations[1].satisfied).isFalse()
             assertThat(result.evaluations[1].actualValue).isNull()
@@ -196,6 +197,7 @@ class RuleEngineTest {
             val result = ruleEngine.evaluate(facts, expressions)
 
             assertThat(result.allSatisfied).isFalse()
+            assertThat(result.outcome).isEqualTo(RuleEvaluationOutcome.INDETERMINATE)
         }
     }
 

@@ -38,6 +38,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("io.github.erdtman:java-json-canonicalization:1.1")
 
     // JSONB support via hypersistence-utils
     implementation("io.hypersistence:hypersistence-utils-hibernate-63:3.8.3")

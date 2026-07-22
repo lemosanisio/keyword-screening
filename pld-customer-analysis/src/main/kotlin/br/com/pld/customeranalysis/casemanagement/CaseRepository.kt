@@ -3,10 +3,10 @@ package br.com.pld.customeranalysis.casemanagement
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface CaseJpaRepository : JpaRepository<CaseEntity, String> {
-    fun findTopByPartyIdAndOriginAndStatusAndGroupingPolicyVersionOrderByCreatedAtAsc(
+    fun findTopByPartyIdAndOriginAndStatusInAndGroupingPolicyVersionOrderByCreatedAtAsc(
         partyId: String,
         origin: CaseOrigin,
-        status: CaseStatus,
+        statuses: Collection<CaseStatus>,
         groupingPolicyVersion: String,
     ): CaseEntity?
 
@@ -21,6 +21,12 @@ interface CaseSourceJpaRepository : JpaRepository<CaseSourceEntity, String> {
         sourceId: String,
         groupingPolicyVersion: String,
     ): Boolean
+
+    fun findBySourceSystemAndSourceIdAndGroupingPolicyVersion(
+        sourceSystem: String,
+        sourceId: String,
+        groupingPolicyVersion: String,
+    ): CaseSourceEntity?
 
     fun findByCaseIdOrderByAttachedAtAsc(caseId: String): List<CaseSourceEntity>
 }

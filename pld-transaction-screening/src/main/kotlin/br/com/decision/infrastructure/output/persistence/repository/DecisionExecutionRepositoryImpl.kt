@@ -28,7 +28,7 @@ class DecisionExecutionRepositoryImpl(
         jpaRepository.findById(id).orElse(null)?.let { mapper.toDomain(it) }
 
     override fun findByTransactionIdAndRuleId(transactionId: TransactionId, ruleId: RuleId): DecisionExecution? =
-        jpaRepository.findByTransactionIdAndRuleId(transactionId.value, ruleId.value)
+        jpaRepository.findTopByTransactionIdAndRuleIdOrderByCreatedAtDesc(transactionId.value, ruleId.value)
             ?.let { mapper.toDomain(it) }
 
     override fun findByTransactionId(transactionId: TransactionId, pageable: Pageable): Page<DecisionExecution> =

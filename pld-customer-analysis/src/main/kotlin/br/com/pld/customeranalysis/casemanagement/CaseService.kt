@@ -17,6 +17,7 @@ import br.com.pld.customeranalysis.timeline.VisibilityClassification
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
@@ -34,25 +35,46 @@ class CaseService(
     private val evidenceService: EvidenceService,
     private val outboxService: OutboxService,
     private val objectMapper: ObjectMapper,
+    private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun recordTransactionSignal(command: RecordTransactionSignalCaseCommand): CaseView? {
+        jdbcTemplate.queryForObject(
+            "SELECT pg_advisory_xact_lock(hashtext(?)) IS NULL",
+            Boolean::class.java,
+            "${command.partyId}:${CaseOrigin.TRANSACTION_ALERT}:$GROUPING_POLICY_VERSION",
+        )
         if (caseSourceRepository.existsBySourceSystemAndSourceIdAndGroupingPolicyVersion(
                 command.sourceSystem,
-                command.signalId,
+                command.sourceId,
                 GROUPING_POLICY_VERSION,
             )
         ) {
-            return null
+            val source = caseSourceRepository.findBySourceSystemAndSourceIdAndGroupingPolicyVersion(
+                command.sourceSystem,
+                command.sourceId,
+                GROUPING_POLICY_VERSION,
+            ) ?: return null
+            return caseRepository.findById(source.caseId).orElse(null)?.let(CaseView::from)
         }
 
         val now = Instant.now(clock)
-        val case = caseRepository
-            .findTopByPartyIdAndOriginAndStatusAndGroupingPolicyVersionOrderByCreatedAtAsc(
+        val case = command.targetCaseId?.let { caseId ->
+            caseRepository.findById(caseId).orElseThrow { CaseNotFoundException(caseId) }.also {
+                require(it.partyId == command.partyId) { "case party conflicts with transaction signal" }
+                require(it.origin == CaseOrigin.TRANSACTION_ALERT) { "case origin conflicts with transaction signal" }
+                require(it.groupingPolicyVersion == GROUPING_POLICY_VERSION) {
+                    "case grouping policy conflicts with transaction signal"
+                }
+                it.sourceCount += 1
+                it.updatedAt = now
+            }
+        } ?: caseRepository
+            .findTopByPartyIdAndOriginAndStatusInAndGroupingPolicyVersionOrderByCreatedAtAsc(
                 partyId = command.partyId,
                 origin = CaseOrigin.TRANSACTION_ALERT,
-                status = CaseStatus.OPEN,
+                statuses = GROUPABLE_CASE_STATUSES,
                 groupingPolicyVersion = GROUPING_POLICY_VERSION,
             )
             ?.also {
@@ -66,8 +88,8 @@ class CaseService(
                 id = PrefixedUlid.next("src_"),
                 caseId = case.id,
                 sourceSystem = command.sourceSystem,
-                sourceId = command.signalId,
-                sourceType = "TransactionSignal",
+                sourceId = command.sourceId,
+                sourceType = command.sourceType,
                 severity = command.severity,
                 reasonCode = command.reasonCode,
                 evaluationId = command.evaluationId,
@@ -791,6 +813,8 @@ class CaseService(
             CaseStatus.WAITING_TECHNICAL,
             CaseStatus.PENDING_APPROVAL,
         )
+
+        private val GROUPABLE_CASE_STATUSES = ACTIVE_CASE_STATUSES - CaseStatus.PENDING_APPROVAL
     }
 }
 
@@ -810,6 +834,9 @@ data class RecordTransactionSignalCaseCommand(
     val reasonCode: String,
     val occurredAt: Instant,
     val correlationId: String,
+    val sourceId: String = signalId,
+    val sourceType: String = "TransactionSignal",
+    val targetCaseId: String? = null,
 )
 
 data class CaseQueueView(

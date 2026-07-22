@@ -14,7 +14,7 @@ Escopo: permitir trabalho humano auditável no caso antes das decisões formais 
 
 ## Próximos marcos
 
-- [ ] Definir corte do próximo marco operacional.
+- [x] Corte dos marcos operacionais seguintes definido e evoluído até o Marco 7.
 
 ## Fora deste corte inicial
 

@@ -47,7 +47,7 @@ Critérios:
 
 ### TS-FR-002 — identidade da avaliação
 
-Cada execução possui `evaluationId` estável e uma chave de idempotência que inclui transação, versão da entrada, versão do ruleset e finalidade.
+Cada execução possui `evaluationId` estável. Avaliações `LIVE` usam a chave natural `(transactionId, transactionVersion, rulesetVersion, purpose)`; execuções não-LIVE usam `(evaluationRequestId, purpose)`, de modo que novo request ID cria reexecução intencional e retry preserva a mesma avaliação.
 
 Finalidades mínimas:
 
@@ -169,9 +169,9 @@ Separar `DecisionResult` de `DecisionExecution`.
 
 Usar outbox transacional para:
 
-- `TransactionEvaluationCompleted.v1`;
+- `TransactionEvaluationCompleted.v2` para avaliações reproduzíveis; v1 permanece congelado durante a convivência;
 - `TransactionSignalDetected.v1`;
-- `ManualReviewRequested.v1`;
+- `ManualReviewRequested.v2` para novos pedidos; v1 permanece congelado durante a convivência;
 - `TransactionDecisionExecutionCompleted.v1`;
 - `RuleConfigurationActivated.v1`.
 
@@ -179,13 +179,13 @@ Eventos seguem `shared/integration-contracts.md` e não carregam PII desnecessá
 
 ### TS-FR-013 — revisão humana externa
 
-Quando a política exigir humano, publicar `ManualReviewRequested.v1`. O estado alvo não cria nem atualiza um `Alert` humano local.
+Quando uma nova avaliação reproduzível exigir humano, publicar `ManualReviewRequested.v2`. O estado alvo não cria nem atualiza um `Alert` humano local.
 
 Durante a migração:
 
 - o módulo `Alert` atual pode operar em shadow/compatibility mode;
 - deve ser possível comparar o alerta legado com o caso criado no novo backend;
-- um feature flag define qual workflow aceita decisão;
+- um único modo `LEGACY`, `SHADOW` ou `MANUAL_REVIEW_LIVE` define qual gatilho pode criar/alterar caso; nunca há dois gatilhos ativos;
 - feedback humano retorna por contrato explícito quando necessário à calibração, sem transferir ownership do caso.
 
 ### TS-FR-014 — consulta e auditoria
@@ -226,4 +226,3 @@ APIs devem permitir:
 - A criação de caso ocorre no novo backend e pode ser correlacionada ao sinal original.
 - A ativação de regra exige o fluxo aprovado e mostra impacto antes/depois.
 - Replay/backtest não executa ação operacional por acidente.
-

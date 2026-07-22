@@ -1,0 +1,44 @@
+{
+  "eventId": "01J6ZK7Q3W8K0M2N4P6R8T0V5A",
+  "eventType": "TransactionEvaluationCompleted",
+  "eventVersion": 2,
+  "occurredAt": "2026-07-20T15:30:00Z",
+  "publishedAt": "2026-07-20T15:30:01Z",
+  "producer": "pld-transaction-screening",
+  "correlationId": "01J6ZK7Q3W8K0M2N4P6R8T0V2B",
+  "causationId": "01J6ZK7Q3W8K0M2N4P6R8T0V5B",
+  "actor": { "type": "SYSTEM", "id": "rule-engine" },
+  "subject": { "partyId": "pty_01J6ZK7Q3W8K0M2N4P6R8T0V2D" },
+  "dataClassification": "CONFIDENTIAL",
+  "payload": {
+    "evaluationId": "evl_01J6ZK7Q3W8K0M2N4P6R8T0V2G",
+    "transactionId": "txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H",
+    "purpose": "LIVE",
+    "inputEventId": "01J6ZK7Q3W8K0M2N4P6R8T0V5C",
+    "inputEventSchemaVersion": 1,
+    "transactionVersion": 3,
+    "evaluatedAt": "2026-07-20T15:30:00Z",
+    "transactionSnapshotRef": "snp_01J6ZK7Q3W8K0M2N4P6R8T0V5D",
+    "snapshotFormatVersion": "transaction-snapshot-v1",
+    "snapshotHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "rulesetVersion": "ruleset-42",
+    "riskContext": {
+      "source": "LEGACY_REST",
+      "quality": "PRESENT",
+      "reasonCode": "LEGACY_SOURCE_WITHOUT_VERSION"
+    },
+    "rulesExecuted": [{ "ruleCode": "PIX-009", "ruleVersion": 4 }],
+    "rulesTriggered": [{ "ruleCode": "PIX-009", "ruleVersion": 4, "explanationCode": "AMOUNT_OUTSIDE_PROFILE" }],
+    "factsConsidered": [
+      { "code": "expectedMonthlyIncome", "quality": "PRESENT" },
+      { "code": "occupation", "quality": "UNKNOWN", "reasonCode": "SOURCE_DID_NOT_PROVIDE" }
+    ],
+    "indeterminateFacts": [],
+    "evaluationOutcome": "SIGNAL_RAISED",
+    "reviewRequired": true,
+    "recommendedRoute": "DERIVED_TO_ANALYST",
+    "explanation": [{ "code": "AMOUNT_OUTSIDE_PROFILE" }],
+    "latencyMs": 42,
+    "executionStatus": "COMPLETED"
+  }
+}

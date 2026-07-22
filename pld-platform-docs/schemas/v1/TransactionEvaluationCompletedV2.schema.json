@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionEvaluationCompleted.v2",
+  "description": "Avaliação transacional reproduzível. Publicada somente para finalidade LIVE; transporta referências e resumo seguro, nunca o snapshot completo.",
+  "allOf": [
+    { "$ref": "common/envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "TransactionEvaluationCompleted" },
+        "eventVersion": { "const": 2 },
+        "producer": { "const": "pld-transaction-screening" },
+        "payload": {
+          "type": "object",
+          "required": [
+            "evaluationId",
+            "transactionId",
+            "purpose",
+            "inputEventId",
+            "inputEventSchemaVersion",
+            "transactionVersion",
+            "evaluatedAt",
+            "transactionSnapshotRef",
+            "snapshotFormatVersion",
+            "snapshotHash",
+            "rulesetVersion",
+            "riskContext",
+            "rulesExecuted",
+            "rulesTriggered",
+            "factsConsidered",
+            "indeterminateFacts",
+            "explanation",
+            "executionStatus"
+          ],
+          "properties": {
+            "evaluationId": {
+              "type": "string",
+              "pattern": "^evl_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "transactionId": {
+              "type": "string",
+              "pattern": "^txn_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "purpose": {
+              "const": "LIVE",
+              "description": "Eventos operacionais são publicados somente para avaliações LIVE."
+            },
+            "inputEventId": {
+              "type": "string",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "inputEventSchemaVersion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "transactionVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Versão de negócio da transação, distinta da versão do schema do evento."
+            },
+            "evaluatedAt": { "type": "string", "format": "date-time" },
+            "transactionSnapshotRef": { "type": "string", "minLength": 1 },
+            "snapshotFormatVersion": { "const": "transaction-snapshot-v1" },
+            "snapshotHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "SHA-256 em hexadecimal minúsculo sobre JSON canonicalizado conforme RFC 8785."
+            },
+            "rulesetVersion": { "type": "string", "minLength": 1 },
+            "riskContext": {
+              "type": "object",
+              "required": ["source", "quality"],
+              "properties": {
+                "source": { "enum": ["LOCAL_PROJECTION", "LEGACY_REST"] },
+                "quality": { "enum": ["PRESENT", "UNKNOWN", "STALE", "ERROR"] },
+                "riskProfileVersion": { "type": "integer", "minimum": 1 },
+                "reasonCode": { "type": "string", "minLength": 1 }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "source": { "const": "LOCAL_PROJECTION" },
+                      "quality": { "const": "PRESENT" }
+                    },
+                    "required": ["source", "quality"]
+                  },
+                  "then": { "required": ["riskProfileVersion"] }
+                },
+                {
+                  "if": {
+                    "properties": { "source": { "const": "LEGACY_REST" } },
+                    "required": ["source"]
+                  },
+                  "then": { "required": ["reasonCode"] }
+                },
+                {
+                  "if": {
+                    "properties": { "quality": { "enum": ["UNKNOWN", "STALE", "ERROR"] } },
+                    "required": ["quality"]
+                  },
+                  "then": { "required": ["reasonCode"] }
+                }
+              ]
+            },
+            "rulesExecuted": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ruleCode", "ruleVersion"],
+                "properties": {
+                  "ruleCode": { "type": "string", "minLength": 1 },
+                  "ruleVersion": { "type": "integer", "minimum": 1 }
+                }
+              }
+            },
+            "rulesTriggered": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ruleCode", "ruleVersion"],
+                "properties": {
+                  "ruleCode": { "type": "string", "minLength": 1 },
+                  "ruleVersion": { "type": "integer", "minimum": 1 },
+                  "explanationCode": { "type": "string" }
+                }
+              }
+            },
+            "factsConsidered": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["code", "quality"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1 },
+                  "quality": { "enum": ["PRESENT", "UNKNOWN", "STALE", "ERROR"] },
+                  "reasonCode": { "type": "string", "minLength": 1 }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": { "quality": { "enum": ["UNKNOWN", "STALE", "ERROR"] } },
+                      "required": ["quality"]
+                    },
+                    "then": { "required": ["reasonCode"] }
+                  }
+                ]
+              }
+            },
+            "indeterminateFacts": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "evaluationOutcome": {
+              "enum": ["NO_SIGNAL", "SIGNAL_RAISED"],
+              "description": "Resultado da detecção; revisão humana é uma dimensão separada."
+            },
+            "reviewRequired": { "type": "boolean" },
+            "recommendedRoute": {
+              "enum": ["DERIVED_TO_ANALYST", "MANDATORY_SECOND_APPROVAL", "TECHNICAL_RETRY"]
+            },
+            "explanation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": { "type": "string", "minLength": 1 },
+                  "detail": { "type": "string" }
+                }
+              }
+            },
+            "latencyMs": { "type": "integer", "minimum": 0 },
+            "executionStatus": { "enum": ["COMPLETED", "INDETERMINATE", "FAILED"] },
+            "failureStage": { "enum": ["FACT_RESOLUTION", "RULE_EVALUATION", "DECISION"] },
+            "failureCode": { "type": "string", "minLength": 1 }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "executionStatus": { "enum": ["COMPLETED", "INDETERMINATE"] } },
+                "required": ["executionStatus"]
+              },
+              "then": { "required": ["evaluationOutcome", "reviewRequired"] }
+            },
+            {
+              "if": {
+                "properties": { "executionStatus": { "const": "INDETERMINATE" } },
+                "required": ["executionStatus"]
+              },
+              "then": {
+                "properties": { "indeterminateFacts": { "minItems": 1 } }
+              }
+            },
+            {
+              "if": {
+                "properties": { "executionStatus": { "const": "FAILED" } },
+                "required": ["executionStatus"]
+              },
+              "then": {
+                "required": ["failureStage", "failureCode"],
+                "not": {
+                  "anyOf": [
+                    { "required": ["evaluationOutcome"] },
+                    { "required": ["reviewRequired"] },
+                    { "required": ["recommendedRoute"] }
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": { "reviewRequired": { "const": true } },
+                "required": ["reviewRequired"]
+              },
+              "then": {
+                "required": ["recommendedRoute"],
+                "properties": {
+                  "recommendedRoute": {
+                    "enum": ["DERIVED_TO_ANALYST", "MANDATORY_SECOND_APPROVAL"]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": { "reviewRequired": { "const": false } },
+                "required": ["reviewRequired"]
+              },
+              "then": {
+                "properties": { "recommendedRoute": { "const": "TECHNICAL_RETRY" } }
+              }
+            },
+            {
+              "if": {
+                "properties": { "evaluationOutcome": { "const": "NO_SIGNAL" } },
+                "required": ["evaluationOutcome"]
+              },
+              "then": { "properties": { "rulesTriggered": { "maxItems": 0 } } }
+            },
+            {
+              "if": {
+                "properties": { "evaluationOutcome": { "const": "SIGNAL_RAISED" } },
+                "required": ["evaluationOutcome"]
+              },
+              "then": { "properties": { "rulesTriggered": { "minItems": 1 } } }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

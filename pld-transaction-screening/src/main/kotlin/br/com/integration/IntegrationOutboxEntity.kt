@@ -20,6 +20,7 @@ class IntegrationOutboxEntity(
     var eventVersion: Int = 1,
     var aggregateType: String = "",
     var aggregateId: String = "",
+    var logicalId: String = "",
     @JdbcTypeCode(SqlTypes.JSON)
     var envelope: String = "{}",
     var occurredAt: Instant = Instant.EPOCH,

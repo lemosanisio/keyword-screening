@@ -35,13 +35,15 @@ class KeywordScreeningServiceTest {
     private val restrictedTermsCache = mockk<RestrictedTermsCache>()
     private val idempotencyService = mockk<IdempotencyService>()
     private val domainEventPublisher = mockk<DomainEventPublisher>()
+    private val screeningIntakeGuard = mockk<ScreeningIntakeGuard>(relaxed = true)
 
     private val service = KeywordScreeningService(
         textNormalizer = textNormalizer,
         keywordMatcher = keywordMatcher,
         restrictedTermsCache = restrictedTermsCache,
         idempotencyService = idempotencyService,
-        domainEventPublisher = domainEventPublisher
+        domainEventPublisher = domainEventPublisher,
+        screeningIntakeGuard = screeningIntakeGuard,
     )
 
     private val transactionId = TransactionId("TX-001")
@@ -51,7 +53,8 @@ class KeywordScreeningServiceTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(textNormalizer, keywordMatcher, restrictedTermsCache, idempotencyService, domainEventPublisher)
+        clearMocks(textNormalizer, keywordMatcher, restrictedTermsCache, idempotencyService, domainEventPublisher, screeningIntakeGuard)
+        every { screeningIntakeGuard.register(any(), any(), any()) } returns "01J6ZK7Q3W8K0M2N4P6R8T0V6A"
     }
 
     @Test

@@ -19,7 +19,14 @@ data class DetectionEvent(
     val transactionId: TransactionId,
     val customerId: CustomerId,
     val ruleCode: RuleCode,
-    val detectionResult: DetectionResult
+    val detectionResult: DetectionResult,
+    val inputEventId: String? = null,
+    val inputEventSchemaVersion: Int = 1,
+    val transactionVersion: Int = 1,
+    val purpose: String = "LIVE",
+    val sourceSystem: String = "SCREENING",
+    val transactionSnapshot: Map<String, Any?> = emptyMap(),
+    val evaluationRequestId: String? = null,
 ) : DomainEvent
 
 /**

@@ -30,12 +30,18 @@ class KeywordScreeningService(
     private val keywordMatcher: KeywordMatcher,
     private val restrictedTermsCache: RestrictedTermsCache,
     private val idempotencyService: IdempotencyService,
-    private val domainEventPublisher: DomainEventPublisher
+    private val domainEventPublisher: DomainEventPublisher,
+    private val screeningIntakeGuard: ScreeningIntakeGuard,
 ) : EvaluateKeywordScreeningUseCase, ScreeningRule {
 
     override val ruleCode = "KEYWORD_SCREENING"
 
     override fun execute(command: EvaluateKeywordScreeningCommand): EvaluateKeywordScreeningResult {
+        val inputEventId = screeningIntakeGuard.register(
+            command.transactionId.value,
+            command.customerId.value,
+            command.description,
+        )
         // Check idempotency
         val existing = idempotencyService.findExisting(command.transactionId, ruleCode)
         if (existing != null) {
@@ -53,7 +59,7 @@ class KeywordScreeningService(
 
         // Publish DetectionEvent
         val detectionEvent = DetectionEvent(
-            eventId = EventId(PrefixedUlid.ulid()),
+            eventId = EventId(inputEventId),
             traceId = TraceId(command.correlationId ?: PrefixedUlid.ulid()),
             timestamp = Instant.now(),
             transactionId = command.transactionId,
@@ -64,7 +70,15 @@ class KeywordScreeningService(
                 matches = persisted.matches.map {
                     DetectionMatch(term = it.term, category = it.category.name)
                 }
-            )
+            ),
+            inputEventId = inputEventId,
+            sourceSystem = "LEGACY_HTTP",
+            transactionSnapshot = mapOf(
+                "sourceSystem" to "LEGACY_HTTP",
+                "externalTransactionId" to command.transactionId.value,
+                "customerId" to command.customerId.value,
+                "description" to command.description,
+            ),
         )
         domainEventPublisher.publish(detectionEvent)
 

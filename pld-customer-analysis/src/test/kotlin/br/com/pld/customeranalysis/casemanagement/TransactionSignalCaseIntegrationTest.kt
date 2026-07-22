@@ -48,7 +48,7 @@ class TransactionSignalCaseIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table fact_version, evidence_record, source_execution, analysis_requirement, evidence_collection, account_decision, suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table manual_review_request, transaction_signal_projection, transaction_evaluation_projection, fact_version, evidence_record, source_execution, analysis_requirement, evidence_collection, account_decision, suspicion_decision, case_comment, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 

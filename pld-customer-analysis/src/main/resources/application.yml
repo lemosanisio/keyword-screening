@@ -42,7 +42,10 @@ springdoc:
 
 pld:
   transaction-signals:
+    case-trigger-mode: ${PLD_TRANSACTION_SIGNALS_CASE_TRIGGER_MODE:LEGACY}
     case-creation-enabled: ${PLD_TRANSACTION_SIGNALS_CASE_CREATION_ENABLED:true}
+    manual-review-cutover-at: ${PLD_TRANSACTION_SIGNALS_MANUAL_REVIEW_CUTOVER_AT:9999-12-31T23:59:59Z}
+    reconciliation-enabled: ${PLD_TRANSACTION_SIGNALS_RECONCILIATION_ENABLED:false}
     accepted-producer: ${PLD_TRANSACTION_SIGNALS_ACCEPTED_PRODUCER:pld-transaction-screening}
   integration:
     outbox-drain:

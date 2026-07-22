@@ -27,11 +27,11 @@ Estas APIs pertencem ao motor transacional/regra e continuam sendo responsabilid
 
 ## Mantidas com publicação/eventos futuros
 
-Estas APIs podem continuar existindo, mas no Marco 2 passam a produzir eventos duráveis sem alterar a resposta HTTP atual.
+Estas APIs continuam existindo e passam a produzir eventos duráveis sem alterar a resposta HTTP atual.
 
 | Método | Path | Operation | Evolução planejada |
 |---|---|---|---|
-| POST | `/v1/rules/keyword-screening/evaluate` | `evaluateKeywordScreening` | Manter resposta atual. Futuro: persistir snapshot/avaliação e publicar `TransactionEvaluationCompleted.v1`, `TransactionSignalDetected.v1` e, quando aplicável, `ManualReviewRequested.v1`. |
+| POST | `/v1/rules/keyword-screening/evaluate` | `evaluateKeywordScreening` | Manter resposta atual. No Marco 7: persistir snapshot/avaliação e publicar `TransactionEvaluationCompleted.v2`, `TransactionSignalDetected.v1` e, quando aplicável, `ManualReviewRequested.v2`. |
 | POST | `/v1/rules/contextual-screening/evaluate` | `evaluateContextualScreening` | Manter resposta atual. Futuro: decidir se avaliação contextual participa do mesmo fluxo de eventos ou permanece como capacidade auxiliar/legada. |
 
 ## Legado em convivência
@@ -42,7 +42,7 @@ Estas APIs representam a fila humana local antiga. O ownership futuro de caso/fi
 |---|---|---|---|
 | GET | `/v1/alerts` | `searchAlerts` | Legado. Manter durante convivência; futuro substituto é fila/casos do customer-analysis. |
 | GET | `/v1/alerts/{alertId}` | `getAlertById` | Legado. |
-| PATCH/PUT | `/v1/alerts/{alertId}/status` | `updateAlertStatus` | Legado. Bloquear novas decisões humanas aqui somente no Marco 7, após comparação e migração. |
+| PATCH/PUT | `/v1/alerts/{alertId}/status` | `updateAlertStatus` | Legado. Bloquear novas decisões humanas somente em marco posterior, após comparação e migração. |
 | POST | `/v1/rules/contextual-screening/decisions` | `registerAnalystDecision` | Legado/ponte. Futuro substituto é decisão em caso no customer-analysis. |
 
 ## Invariantes de compatibilidade
@@ -50,13 +50,13 @@ Estas APIs representam a fila humana local antiga. O ownership futuro de caso/fi
 - Não remover path, campo obrigatório ou valor de enum existente sem janela de convivência.
 - Não mudar semântica de status HTTP já publicado.
 - Novos campos de resposta devem ser aditivos e opcionais.
-- Publicação de eventos no Marco 2 não pode alterar resposta HTTP atual.
+- Publicação de eventos não pode alterar resposta HTTP atual.
 - APIs legadas devem ter telemetria de uso antes de qualquer remoção.
 - Se o Workbench precisar expor administração transacional, usar BFF/gateway/fachada autorizada; não duplicar regra no customer-analysis.
 
 ## Dependências para retirada futura
 
-- `pld-customer-analysis` consumindo `ManualReviewRequested.v1` com inbox e abrindo/atualizando caso sem duplicidade.
+- `pld-customer-analysis` consumindo `ManualReviewRequested.v2` com inbox e abrindo/atualizando caso sem duplicidade.
 - Workbench usando fila/caso do customer-analysis como tela principal.
 - Período medido comparando casos gerados no legado e no novo fluxo.
 - Confirmação de que não há consumidores externos dos endpoints legados de alertas/decisão contextual.

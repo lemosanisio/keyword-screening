@@ -36,7 +36,12 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
                 failedExpressions = entity.failedExpressions.map { mapToEvaluation(it) },
                 executionTimeMs = entity.executionTimeMs,
                 configurationVersion = ConfigurationVersion(entity.configurationVersion),
-                facts = mapToFacts(entity.facts)
+                facts = mapToFacts(entity.facts),
+                factResults = entity.factResults.map(::mapToFactResult),
+                evaluationStatus = br.com.decision.domain.model.EvaluationStatus.valueOf(entity.evaluationStatus),
+                evaluationOutcome = br.com.decision.domain.model.EvaluationOutcome.valueOf(entity.evaluationOutcome),
+                reviewRequired = entity.reviewRequired,
+                recommendedRoute = entity.recommendedRoute?.let(br.com.decision.domain.model.RecommendedRoute::valueOf),
             ),
             explanation = mapToExplanation(entity.explanation),
             executionTimeMs = entity.executionTimeMs,
@@ -55,6 +60,7 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
             ruleId = domain.ruleId.value,
             configurationVersion = domain.configurationVersion.value,
             facts = mapFromFacts(domain.facts),
+            factResults = domain.result.factResults.map(::mapFromFactResult),
             decision = domain.result.decision.name,
             actions = domain.result.actions.map { it.name },
             matchedExpressions = domain.result.matchedExpressions.map { mapFromEvaluation(it) },
@@ -66,6 +72,10 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
             partyId = domain.partyId,
             correlationId = domain.correlationId,
             causationId = domain.causationId,
+            evaluationStatus = domain.result.evaluationStatus.name,
+            evaluationOutcome = domain.result.evaluationOutcome.name,
+            reviewRequired = domain.result.reviewRequired,
+            recommendedRoute = domain.result.recommendedRoute?.name,
             createdAt = domain.timestamp
         )
 
@@ -111,6 +121,24 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
         is FactValue.MoneyValue -> mapOf("type" to "MONEY", "amount" to value.amount, "currency" to value.currency)
     }
 
+    private fun mapToFactResult(raw: Map<String, Any?>): br.com.decision.domain.model.FactResult =
+        br.com.decision.domain.model.FactResult(
+            name = FactName(raw["name"] as String),
+            quality = br.com.decision.domain.model.FactQuality.valueOf(raw["quality"] as String),
+            value = raw["value"]?.let(::mapToFactValue),
+            source = raw["source"] as String,
+            reasonCode = raw["reasonCode"] as? String,
+        )
+
+    private fun mapFromFactResult(result: br.com.decision.domain.model.FactResult): Map<String, Any?> =
+        mapOf(
+            "name" to result.name.value,
+            "quality" to result.quality.name,
+            "value" to result.value?.let(::mapFromFactValue),
+            "source" to result.source,
+            "reasonCode" to result.reasonCode,
+        ).filterValues { it != null }
+
     // --- ExpressionEvaluation serialization ---
 
     private fun mapToEvaluation(map: Map<String, Any?>): ExpressionEvaluation =
@@ -120,7 +148,11 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
             expectedValue = mapToFactValue(map["expectedValue"]),
             actualValue = map["actualValue"]?.let { mapToFactValue(it) },
             satisfied = map["satisfied"] as Boolean,
-            justification = map["justification"] as? String ?: ""
+            justification = map["justification"] as? String ?: "",
+            outcome = (map["outcome"] as? String)
+                ?.let(br.com.decision.domain.model.ExpressionOutcome::valueOf)
+                ?: if (map["satisfied"] as Boolean) br.com.decision.domain.model.ExpressionOutcome.TRUE
+                else br.com.decision.domain.model.ExpressionOutcome.FALSE,
         )
 
     private fun mapFromEvaluation(eval: ExpressionEvaluation): Map<String, Any?> = mapOf(
@@ -129,6 +161,7 @@ class DecisionExecutionMapper(private val objectMapper: ObjectMapper) {
         "expectedValue" to mapFromFactValue(eval.expectedValue),
         "actualValue" to eval.actualValue?.let { mapFromFactValue(it) },
         "satisfied" to eval.satisfied,
+        "outcome" to eval.outcome.name,
         "justification" to eval.justification
     )
 

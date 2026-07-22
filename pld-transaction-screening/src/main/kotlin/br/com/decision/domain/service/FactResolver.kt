@@ -17,6 +17,9 @@ interface FactResolver {
     /** Entity à qual os facts pertencem */
     val entity: String
 
+    /** Origem auditável usada no resultado do fato. */
+    val sourceSystem: String get() = entity
+
     /** Resolve os facts a partir do contexto do evento */
     fun resolve(event: DetectionEvent): List<Fact>
 }

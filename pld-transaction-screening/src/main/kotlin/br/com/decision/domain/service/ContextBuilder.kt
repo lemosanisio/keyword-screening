@@ -3,6 +3,8 @@ package br.com.decision.domain.service
 import br.com.decision.domain.event.DetectionEvent
 import br.com.decision.domain.model.ResolverOutcome
 import br.com.decision.domain.model.ResolverResult
+import br.com.decision.domain.model.FactQuality
+import br.com.decision.domain.model.FactResult
 import br.com.decision.domain.model.vo.FactName
 import br.com.decision.domain.model.vo.FactValue
 import org.slf4j.LoggerFactory
@@ -41,6 +43,7 @@ class ContextBuilder(
         }
 
         val allFacts = mutableMapOf<FactName, FactValue>()
+        val factResults = mutableMapOf<FactName, FactResult>()
         val allResults = mutableListOf<ResolverResult>()
 
         for (resolver in relevantResolvers) {
@@ -52,6 +55,12 @@ class ContextBuilder(
 
                 for (fact in facts) {
                     allFacts[fact.name] = fact.value
+                    factResults[fact.name] = FactResult(
+                        name = fact.name,
+                        quality = FactQuality.PRESENT,
+                        value = fact.value,
+                        source = resolver.sourceSystem,
+                    )
                     allResults.add(
                         ResolverResult(
                             resolverName = resolver::class.simpleName ?: "Unknown",
@@ -67,6 +76,14 @@ class ContextBuilder(
                         )
                     )
                 }
+                for (factName in resolver.producedFacts.filter { it in requiredSet && it !in factResults }) {
+                    factResults[factName] = FactResult(
+                        name = factName,
+                        quality = FactQuality.UNKNOWN,
+                        source = resolver.sourceSystem,
+                        reasonCode = "SOURCE_DID_NOT_PROVIDE",
+                    )
+                }
             } catch (e: Exception) {
                 val finishedAt = Instant.now()
                 val durationMs = Duration.between(startedAt, finishedAt).toMillis()
@@ -80,6 +97,12 @@ class ContextBuilder(
                 )
 
                 for (factName in resolver.producedFacts.filter { it in requiredSet }) {
+                    factResults[factName] = FactResult(
+                        name = factName,
+                        quality = FactQuality.ERROR,
+                        source = resolver.sourceSystem,
+                        reasonCode = "RESOLVER_FAILURE",
+                    )
                     allResults.add(
                         ResolverResult(
                             resolverName = resolver::class.simpleName ?: "Unknown",
@@ -99,8 +122,18 @@ class ContextBuilder(
             }
         }
 
+        for (factName in requiredSet.filter { it !in factResults }) {
+            factResults[factName] = FactResult(
+                name = factName,
+                quality = FactQuality.UNKNOWN,
+                source = "UNRESOLVED",
+                reasonCode = "NO_RESOLVER",
+            )
+        }
+
         return FactSet(
             facts = allFacts,
+            factResults = factResults.values.toList(),
             resolverResults = allResults
         )
     }
@@ -111,5 +144,8 @@ class ContextBuilder(
  */
 data class FactSet(
     val facts: Map<FactName, FactValue>,
+    val factResults: List<FactResult> = facts.map { (name, value) ->
+        FactResult(name, FactQuality.PRESENT, value, "DECISION_CONTEXT")
+    },
     val resolverResults: List<ResolverResult>
 )

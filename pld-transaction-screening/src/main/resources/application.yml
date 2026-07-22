@@ -36,6 +36,7 @@ pld:
   integration:
     transaction-signals:
       enabled: ${PLD_TRANSACTION_SIGNALS_ENABLED:false}
+      operational-events-enabled: ${PLD_TRANSACTION_EVALUATIONS_ENABLED:true}
       queue-url: ${PLD_TRANSACTION_SIGNALS_QUEUE_URL:}
     sqs:
       enabled: ${PLD_SQS_ENABLED:false}

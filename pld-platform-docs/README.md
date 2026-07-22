@@ -79,6 +79,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [ADR-007 — plataforma de eventos](adr/ADR-007-eventing-platform.md)
 - [ADR-008 — escopo do Marco 1 e ordenação de filas](adr/ADR-008-marco-1-scope-and-queue-ordering.md)
 - [ADR-009 — fatia vertical do sinal transacional](adr/ADR-009-transaction-signal-vertical-slice.md)
+- [ADR-010 — avaliação transacional reproduzível](adr/ADR-010-reproducible-transaction-evaluation.md)
 - [Decisões pendentes](open-decisions.md)
 - [Marco 0 — tasks](marco-0-tasks.md)
 - [Marco 1 — tasks](marco-1-tasks.md)
@@ -87,6 +88,7 @@ O MCP pode ser acrescentado depois como outro adaptador dos casos de uso. Ele n�
 - [Marco 4 — tasks](marco-4-tasks.md)
 - [Marco 5 — tasks](marco-5-tasks.md)
 - [Marco 6 — tasks](marco-6-tasks.md)
+- [Marco 7 — tasks](marco-7-tasks.md)
 - [Handoff para o agente local](agent-handoff.md)
 
 ## Ordem recomendada de implementação

@@ -60,6 +60,58 @@ class ContractSchemaValidationTest {
             .isEmpty()
     }
 
+    @Test
+    fun `avaliacao failed rejeita outcome e revisao`() {
+        val fixture = mapper.readTree(Files.readString(fixturePath("TransactionEvaluationCompletedV2")))
+            as ObjectNode
+        val payload = fixture.get("payload") as ObjectNode
+        payload.put("executionStatus", "FAILED")
+        payload.put("failureStage", "RULE_EVALUATION")
+        payload.put("failureCode", "RULE_ENGINE_UNAVAILABLE")
+
+        val errors = validate("TransactionEvaluationCompletedV2", mapper.writeValueAsString(fixture))
+
+        assertThat(errors).isNotEmpty()
+    }
+
+    @Test
+    fun `avaliacao indeterminate exige fato indeterminado`() {
+        val fixture = mapper.readTree(Files.readString(fixturePath("TransactionEvaluationCompletedV2")))
+            as ObjectNode
+        val payload = fixture.get("payload") as ObjectNode
+        payload.put("executionStatus", "INDETERMINATE")
+        payload.putArray("indeterminateFacts")
+
+        val errors = validate("TransactionEvaluationCompletedV2", mapper.writeValueAsString(fixture))
+
+        assertThat(errors).isNotEmpty()
+    }
+
+    @Test
+    fun `fato nao presente exige reason code`() {
+        val fixture = mapper.readTree(Files.readString(fixturePath("TransactionEvaluationCompletedV2")))
+            as ObjectNode
+        val payload = fixture.get("payload") as ObjectNode
+        val unknownFact = payload.get("factsConsidered").get(1) as ObjectNode
+        unknownFact.put("reasonCode", "")
+
+        val errors = validate("TransactionEvaluationCompletedV2", mapper.writeValueAsString(fixture))
+
+        assertThat(errors).isNotEmpty()
+    }
+
+    @Test
+    fun `pedido humano rejeita rota de retry tecnico`() {
+        val fixture = mapper.readTree(Files.readString(fixturePath("ManualReviewRequestedV2")))
+            as ObjectNode
+        val payload = fixture.get("payload") as ObjectNode
+        payload.put("recommendedRoute", "TECHNICAL_RETRY")
+
+        val errors = validate("ManualReviewRequestedV2", mapper.writeValueAsString(fixture))
+
+        assertThat(errors).isNotEmpty()
+    }
+
     private fun validate(eventName: String, json: String): Set<ValidationMessage> =
         schemaFactory
             .getSchema(catalogDir.resolve("$eventName.schema.json").toUri())

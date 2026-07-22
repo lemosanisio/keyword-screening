@@ -98,6 +98,8 @@ class DecisionFlowIntegrationTest {
             registry.add("spring.datasource.username") { postgres.username }
             registry.add("spring.datasource.password") { postgres.password }
         }
+
+        private val noRiskPartyIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     }
 
     @TestConfiguration
@@ -110,6 +112,7 @@ class DecisionFlowIntegrationTest {
                     return when (customerId.value) {
                         "CUST-HIGH-RISK" -> CustomerRisk.AR
                         "CUST-LOW-RISK" -> CustomerRisk.BR
+                        in noRiskPartyIds -> null
                         else -> CustomerRisk.MR
                     }
                 }
@@ -191,8 +194,8 @@ class DecisionFlowIntegrationTest {
             transactionId
         )
         assertEquals("OPEN", alertStatus)
-        assertEquals(0L, jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM integration_outbox WHERE envelope -> 'payload' ->> 'transactionId' = ?",
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox o JOIN transaction_evaluation e ON e.evaluation_id = o.aggregate_id WHERE e.external_transaction_id = ?",
             Long::class.java,
             transactionId,
         ))
@@ -248,7 +251,7 @@ class DecisionFlowIntegrationTest {
     }
 
     @Test
-    fun `typed transaction and party produce one schema-valid signal outbox`() {
+    fun `typed transaction and party produce schema-valid evaluation signal and review outbox`() {
         val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
         ensureActiveRuleConfiguration(ruleId)
         val transactionId = "txn_01J6ZK7Q3W8K0M2N4P6R8T0V2H"
@@ -287,23 +290,10 @@ class DecisionFlowIntegrationTest {
             transactionId,
         ))
 
-        val envelope = objectMapper.readTree(
-            jdbcTemplate.queryForObject(
-                "SELECT envelope::text FROM integration_outbox WHERE aggregate_id = ?",
-                String::class.java,
-                evaluationId,
-            ),
-        ).deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
-        envelope.put("publishedAt", Instant.now().toString())
-
-        val schemaPath = Path.of(System.getProperty("user.dir"))
-            .resolveSibling("pld-platform-docs/schemas/v1/TransactionSignalDetected.schema.json")
-        val errors = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
-            .getSchema(schemaPath.toUri())
-            .validate(envelope)
-
-        assertTrue(errors.isEmpty(), errors.joinToString("\n"))
-        assertEquals(1L, jdbcTemplate.queryForObject(
+        assertEnvelopeValid(evaluationId, "TransactionEvaluationCompleted", "TransactionEvaluationCompletedV2")
+        assertEnvelopeValid(evaluationId, "TransactionSignalDetected", "TransactionSignalDetected")
+        assertEnvelopeValid(evaluationId, "ManualReviewRequested", "ManualReviewRequestedV2")
+        assertEquals(3L, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM integration_outbox WHERE aggregate_id = ?",
             Long::class.java,
             evaluationId,
@@ -312,6 +302,11 @@ class DecisionFlowIntegrationTest {
             "SELECT COUNT(*) FROM alert WHERE transaction_id = ?",
             Long::class.java,
             transactionId,
+        ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM transaction_evaluation WHERE evaluation_id = ? AND snapshot_hash ~ '^[a-f0-9]{64}$'",
+            Long::class.java,
+            evaluationId,
         ))
     }
 
@@ -328,6 +323,7 @@ class DecisionFlowIntegrationTest {
                 eventVersion = 1,
                 aggregateType = "TransactionEvaluation",
                 aggregateId = br.com.shared.domain.valueobject.PrefixedUlid.next("evl_"),
+                logicalId = eventId,
                 envelope = envelope,
                 occurredAt = Instant.now(),
                 nextAttemptAt = Instant.EPOCH,
@@ -383,6 +379,11 @@ class DecisionFlowIntegrationTest {
             Long::class.java,
             transactionId,
         ))
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM transaction_evaluation WHERE external_transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
 
         evaluateKeywordScreeningUseCase.execute(command)
 
@@ -396,11 +397,182 @@ class DecisionFlowIntegrationTest {
             Long::class.java,
             transactionId,
         ))
-        assertEquals(1L, jdbcTemplate.queryForObject(
+        assertEquals(3L, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM integration_outbox WHERE envelope -> 'payload' ->> 'transactionId' = ?",
             Long::class.java,
             transactionId,
         ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM transaction_evaluation WHERE external_transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+    }
+
+    @Test
+    fun `no signal produces only evaluation completion`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val transactionId = br.com.shared.domain.valueobject.PrefixedUlid.next("txn_")
+        val partyId = br.com.shared.domain.valueobject.PrefixedUlid.next("pty_")
+
+        evaluateKeywordScreeningUseCase.execute(
+            EvaluateKeywordScreeningCommand(
+                transactionId = TransactionId(transactionId),
+                customerId = CustomerId(partyId),
+                description = "pagamento comum de mercado",
+            ),
+        )
+
+        val evaluationId = jdbcTemplate.queryForObject(
+            "SELECT evaluation_id FROM transaction_evaluation WHERE transaction_id = ?",
+            String::class.java,
+            transactionId,
+        )!!
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE aggregate_id = ? AND event_type = 'TransactionEvaluationCompleted'",
+            Long::class.java,
+            evaluationId,
+        ))
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE aggregate_id = ? AND event_type <> 'TransactionEvaluationCompleted'",
+            Long::class.java,
+            evaluationId,
+        ))
+        assertEnvelopeValid(evaluationId, "TransactionEvaluationCompleted", "TransactionEvaluationCompletedV2")
+    }
+
+    @Test
+    fun `missing risk is indeterminate and requests review without signal`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val externalTransactionId = "TX-INDETERMINATE-${UUID.randomUUID()}"
+        val partyId = br.com.shared.domain.valueobject.PrefixedUlid.next("pty_")
+        noRiskPartyIds += partyId
+        applicationEventPublisher.publishEvent(
+            DetectionEvent(
+                eventId = EventId(br.com.shared.domain.valueobject.PrefixedUlid.ulid()),
+                traceId = TraceId(br.com.shared.domain.valueobject.PrefixedUlid.ulid()),
+                timestamp = Instant.now(),
+                transactionId = TransactionId(externalTransactionId),
+                customerId = CustomerId(partyId),
+                ruleCode = RuleCode("KEYWORD_SCREENING"),
+                detectionResult = DetectionResult(
+                    matched = true,
+                    matches = listOf(DetectionMatch("lavagem", "AML")),
+                ),
+            ),
+        )
+
+        val evaluationId = jdbcTemplate.queryForObject(
+            "SELECT evaluation_id FROM transaction_evaluation WHERE external_transaction_id = ?",
+            String::class.java,
+            externalTransactionId,
+        )!!
+        assertEquals("INDETERMINATE", jdbcTemplate.queryForObject(
+            "SELECT execution_status FROM transaction_evaluation WHERE evaluation_id = ?",
+            String::class.java,
+            evaluationId,
+        ))
+        assertEquals("UNKNOWN", jdbcTemplate.queryForObject(
+            "SELECT fact ->> 'quality' FROM transaction_evaluation, jsonb_array_elements(facts) fact WHERE evaluation_id = ? AND fact ->> 'code' = 'customerRisk'",
+            String::class.java,
+            evaluationId,
+        ))
+        assertEquals(0L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox WHERE aggregate_id = ? AND event_type = 'TransactionSignalDetected'",
+            Long::class.java,
+            evaluationId,
+        ))
+        assertEquals("[]", jdbcTemplate.queryForObject(
+            "SELECT (envelope -> 'payload' -> 'signalIds')::text FROM integration_outbox WHERE aggregate_id = ? AND event_type = 'ManualReviewRequested'",
+            String::class.java,
+            evaluationId,
+        ))
+        assertEnvelopeValid(evaluationId, "TransactionEvaluationCompleted", "TransactionEvaluationCompletedV2")
+        assertEnvelopeValid(evaluationId, "ManualReviewRequested", "ManualReviewRequestedV2")
+    }
+
+    @Test
+    fun `transaction versions and replay requests create distinct idempotent evaluations`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val transactionId = br.com.shared.domain.valueobject.PrefixedUlid.next("txn_")
+        val partyId = br.com.shared.domain.valueobject.PrefixedUlid.next("pty_")
+
+        fun event(version: Int, purpose: String = "LIVE", requestId: String? = null) = DetectionEvent(
+            eventId = EventId(br.com.shared.domain.valueobject.PrefixedUlid.ulid()),
+            traceId = TraceId(br.com.shared.domain.valueobject.PrefixedUlid.ulid()),
+            timestamp = Instant.now(),
+            transactionId = TransactionId(transactionId),
+            customerId = CustomerId(partyId),
+            ruleCode = RuleCode("KEYWORD_SCREENING"),
+            detectionResult = DetectionResult(true, listOf(DetectionMatch("lavagem", "AML"))),
+            transactionVersion = version,
+            purpose = purpose,
+            evaluationRequestId = requestId,
+        )
+
+        applicationEventPublisher.publishEvent(event(1))
+        applicationEventPublisher.publishEvent(event(2))
+        applicationEventPublisher.publishEvent(event(2, "REPLAY", "replay-request-1"))
+        applicationEventPublisher.publishEvent(event(2, "REPLAY", "replay-request-1"))
+
+        assertEquals(3L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM transaction_evaluation WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(2L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM integration_outbox o JOIN transaction_evaluation e ON e.evaluation_id = o.aggregate_id WHERE e.transaction_id = ? AND o.event_type = 'TransactionEvaluationCompleted'",
+            Long::class.java,
+            transactionId,
+        ))
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM alert WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId,
+        ))
+    }
+
+    @Test
+    fun `legacy transaction id rejects divergent payload`() {
+        val ruleId = getRuleDefinitionId("KEYWORD_SCREENING")
+        ensureActiveRuleConfiguration(ruleId)
+        val transactionId = TransactionId("TX-CONFLICT-${UUID.randomUUID()}")
+        val customerId = CustomerId("CUST-HIGH-RISK")
+        evaluateKeywordScreeningUseCase.execute(
+            EvaluateKeywordScreeningCommand(transactionId, customerId, "pagamento comum"),
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            evaluateKeywordScreeningUseCase.execute(
+                EvaluateKeywordScreeningCommand(transactionId, customerId, "pagamento relacionado a lavagem"),
+            )
+        }
+        assertEquals(1L, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM screening_intake WHERE transaction_id = ?",
+            Long::class.java,
+            transactionId.value,
+        ))
+    }
+
+    private fun assertEnvelopeValid(evaluationId: String, eventType: String, schemaName: String) {
+        val envelope = objectMapper.readTree(
+            jdbcTemplate.queryForObject(
+                "SELECT envelope::text FROM integration_outbox WHERE aggregate_id = ? AND event_type = ?",
+                String::class.java,
+                evaluationId,
+                eventType,
+            ),
+        ).deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+        envelope.put("publishedAt", Instant.now().toString())
+        val schemaPath = Path.of(System.getProperty("user.dir"))
+            .resolveSibling("pld-platform-docs/schemas/v1/$schemaName.schema.json")
+        val errors = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
+            .getSchema(schemaPath.toUri())
+            .validate(envelope)
+        assertTrue(errors.isEmpty(), errors.joinToString("\n"))
     }
 
     @Test
@@ -459,7 +631,7 @@ class DecisionFlowIntegrationTest {
                 {"type":"CONDITION","factName":"customerRisk","operator":"GREATER_THAN_OR_EQUAL","expectedValue":{"type":"ENUM","value":"MR"}}
             ]
         """.trimIndent()
-        val actions = """["GENERATE_ALERT"]"""
+        val actions = """["GENERATE_ALERT","REVIEW"]"""
 
         jdbcTemplate.update(
             """

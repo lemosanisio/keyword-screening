@@ -22,6 +22,7 @@ class CustomerResolver(
     override val producedFacts: Set<FactName> = setOf(FactName("customerRisk"))
 
     override val entity: String = "Risk"
+    override val sourceSystem: String = "LEGACY_REST"
 
     override fun resolve(event: DetectionEvent): List<Fact> {
         val risk = customerRiskPort.getCustomerRisk(event.customerId)

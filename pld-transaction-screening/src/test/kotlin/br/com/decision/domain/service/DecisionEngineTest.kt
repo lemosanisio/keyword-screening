@@ -275,6 +275,8 @@ class DecisionEngineTest {
 
             assertThat(result.decision).isEqualTo(Decision.IGNORE)
             assertThat(result.actions).isEmpty()
+            assertThat(result.evaluationStatus).isEqualTo(br.com.decision.domain.model.EvaluationStatus.INDETERMINATE)
+            assertThat(result.reviewRequired).isTrue()
             // keywordMatched matched, customerRisk failed due to absence
             assertThat(result.matchedExpressions).hasSize(1)
             assertThat(result.failedExpressions).hasSize(1)

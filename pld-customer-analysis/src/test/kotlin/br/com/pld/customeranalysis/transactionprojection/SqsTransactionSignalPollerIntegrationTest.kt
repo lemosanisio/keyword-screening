@@ -25,6 +25,8 @@ import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.GetQueueAttributesRequest
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
+import java.nio.file.Files
+import java.nio.file.Path
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -50,7 +52,7 @@ class SqsTransactionSignalPollerIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table manual_review_request, transaction_signal_projection, transaction_evaluation_projection, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
         purgeQueue()
     }
@@ -92,6 +94,23 @@ class SqsTransactionSignalPollerIntegrationTest {
             "CASE_CREATED",
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
+        assertThat(visibleMessageCount()).isEqualTo(0)
+    }
+
+    @Test
+    fun `polls evaluation v2 and deletes message after projection`() {
+        val event = Files.readString(
+            Path.of(System.getProperty("user.dir"))
+                .resolveSibling("pld-platform-docs/schemas/v1/fixtures/TransactionEvaluationCompletedV2.json"),
+        )
+        sqsClient.sendMessage(SendMessageRequest.builder().queueUrl(queueUrl).messageBody(event).build())
+
+        poller.poll()
+
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from transaction_evaluation_projection",
+            Long::class.java,
+        )).isEqualTo(1)
         assertThat(visibleMessageCount()).isEqualTo(0)
     }
 

@@ -18,6 +18,13 @@ import br.com.decision.domain.model.vo.ConfigurationVersion
 import br.com.decision.domain.model.vo.FactName
 import br.com.decision.domain.model.vo.FactValue
 import br.com.decision.domain.model.vo.RuleId
+import br.com.evaluation.domain.RiskContext
+import br.com.evaluation.domain.RuleEvaluationReference
+import br.com.evaluation.domain.TransactionEvaluation
+import br.com.evaluation.infrastructure.SnapshotCanonicalizer
+import br.com.evaluation.infrastructure.TransactionEvaluationRepository
+import br.com.evaluation.infrastructure.TransactionIdentityResolver
+import br.com.evaluation.infrastructure.TransactionEvaluationLock
 import br.com.shared.domain.DomainEventPublisher
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.PrefixedUlid
@@ -48,7 +55,11 @@ class DecisionService(
     private val decisionExecutionRepository: DecisionExecutionRepository,
     private val ruleDefinitionRepository: RuleDefinitionRepository,
     private val ruleConfigurationRepository: RuleConfigurationRepository,
-    private val domainEventPublisher: DomainEventPublisher
+    private val domainEventPublisher: DomainEventPublisher,
+    private val transactionIdentityResolver: TransactionIdentityResolver,
+    private val snapshotCanonicalizer: SnapshotCanonicalizer,
+    private val transactionEvaluationRepository: TransactionEvaluationRepository,
+    private val transactionEvaluationLock: TransactionEvaluationLock,
 ) : ExecuteDecisionUseCase {
 
     private val logger = LoggerFactory.getLogger(DecisionService::class.java)
@@ -60,6 +71,8 @@ class DecisionService(
     override fun execute(command: ExecuteDecisionCommand): DecisionResult {
         val correlationId = command.correlationId ?: PrefixedUlid.ulid()
         val traceId = TraceId(correlationId)
+        val contractTransactionId = transactionIdentityResolver.resolve(command.sourceSystem, command.transactionId.value)
+        transactionEvaluationLock.acquire("transaction", contractTransactionId, command.purpose)
 
         // 1. Buscar RuleDefinition pelo ruleCode
         val ruleDefinition = ruleDefinitionRepository.findByCode(command.ruleCode)
@@ -76,7 +89,7 @@ class DecisionService(
             command.transactionId,
             ruleDefinition.id
         )
-        if (existingExecution != null) {
+        if (existingExecution != null && existingExecution.evaluationId == null) {
             logger.debug(
                 "Execução já existe para transactionId={}, ruleId={}. Retornando resultado existente.",
                 command.transactionId.value,
@@ -87,12 +100,28 @@ class DecisionService(
 
         // 3. Buscar RuleConfiguration ativa
         val activeConfig = ruleConfigurationRepository.findActiveByRuleId(ruleDefinition.id)
+        val rulesetVersion = "${ruleDefinition.code.value}:${activeConfig?.currentVersion?.value ?: 0}"
+        val incomingSnapshotHash = snapshotCanonicalizer.canonicalize(evaluationSnapshot(command)).hash
+        transactionEvaluationRepository.findDecisionExecutionId(
+            transactionId = contractTransactionId,
+            externalTransactionId = command.transactionId.value,
+            sourceSystem = command.sourceSystem,
+            transactionVersion = command.transactionVersion,
+            rulesetVersion = rulesetVersion,
+            purpose = command.purpose,
+            evaluationRequestId = command.evaluationRequestId,
+            inputEventId = command.inputEventId?.takeIf(INPUT_EVENT_ID_REGEX::matches),
+            snapshotHash = incomingSnapshotHash,
+        )?.let { executionId ->
+            decisionExecutionRepository.findById(executionId)?.let { return it.result }
+        }
         if (activeConfig == null) {
             logger.debug(
                 "Nenhuma RuleConfiguration ativa para ruleId={}. Retornando IGNORE com persistência.",
                 ruleDefinition.id.value
             )
             val ignoreResult = buildIgnoreResult()
+            val evaluationId = PrefixedUlid.next("evl_")
             val execution = buildDecisionExecution(
                 transactionId = command.transactionId,
                 ruleId = ruleDefinition.id,
@@ -101,9 +130,22 @@ class DecisionService(
                 result = ignoreResult,
                 explanation = DecisionExplanation(traceId = traceId, steps = emptyList()),
                 executionTimeMs = 0L,
-                traceId = traceId
+                traceId = traceId,
+                evaluationId = evaluationId,
+                partyId = command.customerId.value.takeIf(::isTypedPartyId),
+                correlationId = correlationId,
+                causationId = command.causationId,
             )
-            saveWithRetry(execution)
+            val savedExecution = saveWithRetry(execution)
+            val evaluation = buildTransactionEvaluation(
+                command = command,
+                execution = savedExecution,
+                ruleCode = ruleDefinition.code.value,
+                decisionResult = ignoreResult,
+                contractTransactionId = contractTransactionId,
+            )
+            transactionEvaluationRepository.save(evaluation)
+            publishDecisionMade(command, ruleDefinition.id, ruleDefinition.code, ignoreResult, savedExecution, traceId, evaluation)
             return ignoreResult
         }
 
@@ -130,28 +172,17 @@ class DecisionService(
             causationId = command.causationId,
         )
         val savedExecution = saveWithRetry(execution)
+        val evaluation = buildTransactionEvaluation(
+            command = command,
+            execution = savedExecution,
+            ruleCode = ruleDefinition.code.value,
+            decisionResult = decisionResult,
+            contractTransactionId = contractTransactionId,
+        )
+        transactionEvaluationRepository.save(evaluation)
 
         // 7. Publicar DecisionMadeEvent
-        val event = DecisionMadeEvent(
-            eventId = EventId(PrefixedUlid.ulid()),
-            traceId = traceId,
-            timestamp = Instant.now(),
-            transactionId = command.transactionId,
-            customerId = command.customerId,
-            ruleId = ruleDefinition.id,
-            ruleCode = ruleDefinition.code,
-            decision = decisionResult.decision,
-            actions = decisionResult.actions,
-            facts = decisionResult.facts,
-            matchedExpressions = decisionResult.matchedExpressions,
-            configurationVersion = decisionResult.configurationVersion,
-            executionTimeMs = decisionResult.executionTimeMs,
-            explanation = decisionResult.explanation ?: DecisionExplanation(traceId = traceId, steps = emptyList()),
-            evaluationId = savedExecution.evaluationId,
-            correlationId = savedExecution.correlationId,
-            causationId = savedExecution.causationId,
-        )
-        domainEventPublisher.publish(event)
+        publishDecisionMade(command, ruleDefinition.id, ruleDefinition.code, decisionResult, savedExecution, traceId, evaluation)
 
         logger.info(
             "Decisão executada: transactionId={}, ruleCode={}, decision={}, traceId={}",
@@ -163,6 +194,116 @@ class DecisionService(
 
         return decisionResult
     }
+
+    private fun publishDecisionMade(
+        command: ExecuteDecisionCommand,
+        ruleId: RuleId,
+        ruleCode: br.com.decision.domain.model.vo.RuleCode,
+        decisionResult: DecisionResult,
+        savedExecution: DecisionExecution,
+        traceId: TraceId,
+        evaluation: TransactionEvaluation,
+    ) {
+        val event = DecisionMadeEvent(
+            eventId = EventId(PrefixedUlid.ulid()),
+            traceId = traceId,
+            timestamp = evaluation.evaluatedAt,
+            transactionId = command.transactionId,
+            customerId = command.customerId,
+            ruleId = ruleId,
+            ruleCode = ruleCode,
+            decision = decisionResult.decision,
+            actions = decisionResult.actions,
+            facts = decisionResult.facts,
+            matchedExpressions = decisionResult.matchedExpressions,
+            configurationVersion = decisionResult.configurationVersion,
+            executionTimeMs = decisionResult.executionTimeMs,
+            explanation = decisionResult.explanation ?: DecisionExplanation(traceId = traceId, steps = emptyList()),
+            evaluationId = savedExecution.evaluationId,
+            correlationId = savedExecution.correlationId,
+            causationId = savedExecution.causationId,
+            evaluation = evaluation,
+        )
+        domainEventPublisher.publish(event)
+    }
+
+    private fun buildTransactionEvaluation(
+        command: ExecuteDecisionCommand,
+        execution: DecisionExecution,
+        ruleCode: String,
+        decisionResult: DecisionResult,
+        contractTransactionId: String,
+    ): TransactionEvaluation {
+        val evaluationId = requireNotNull(execution.evaluationId)
+        val snapshot = evaluationSnapshot(command)
+        val canonicalSnapshot = snapshotCanonicalizer.canonicalize(snapshot)
+        val riskFact = decisionResult.factResults.firstOrNull { it.name.value == "customerRisk" }
+        val ruleReference = RuleEvaluationReference(
+            ruleCode = ruleCode,
+            ruleVersion = decisionResult.configurationVersion.value,
+            explanationCode = "KEYWORD_MATCH",
+        )
+
+        return TransactionEvaluation(
+            evaluationId = evaluationId,
+            decisionExecutionId = execution.id,
+            transactionId = contractTransactionId,
+            sourceSystem = command.sourceSystem,
+            externalTransactionId = command.transactionId.value,
+            transactionVersion = command.transactionVersion,
+            purpose = command.purpose,
+            evaluationRequestId = command.evaluationRequestId,
+            inputEventId = command.inputEventId?.takeIf(INPUT_EVENT_ID_REGEX::matches) ?: PrefixedUlid.ulid(),
+            inputEventSchemaVersion = command.inputEventSchemaVersion,
+            snapshot = snapshot,
+            snapshotRef = PrefixedUlid.next("snp_"),
+            snapshotFormatVersion = "transaction-snapshot-v1",
+            snapshotHash = canonicalSnapshot.hash,
+            rulesetVersion = "$ruleCode:${decisionResult.configurationVersion.value}",
+            riskContext = RiskContext(
+                source = riskFact?.source ?: "LEGACY_REST",
+                quality = riskFact?.quality?.name ?: "UNKNOWN",
+                reasonCode = riskFact?.reasonCode ?: if (riskFact?.quality == br.com.decision.domain.model.FactQuality.PRESENT) {
+                    "LEGACY_SOURCE_WITHOUT_VERSION"
+                } else {
+                    "RISK_NOT_EVALUATED"
+                },
+            ),
+            facts = decisionResult.factResults,
+            rulesExecuted = if (decisionResult.configurationVersion.value > 0) {
+                listOf(ruleReference.copy(explanationCode = null))
+            } else {
+                emptyList()
+            },
+            rulesTriggered = if (decisionResult.evaluationOutcome == br.com.decision.domain.model.EvaluationOutcome.SIGNAL_RAISED) {
+                listOf(ruleReference)
+            } else {
+                emptyList()
+            },
+            executionStatus = decisionResult.evaluationStatus,
+            evaluationOutcome = decisionResult.evaluationOutcome,
+            reviewRequired = decisionResult.reviewRequired,
+            recommendedRoute = decisionResult.recommendedRoute,
+            explanation = listOf(mapOf("code" to decisionResult.decision.name)),
+            partyId = command.customerId.value.takeIf(::isTypedPartyId),
+            correlationId = execution.correlationId ?: execution.traceId.value,
+            causationId = execution.causationId,
+            evaluatedAt = execution.timestamp,
+        )
+    }
+
+    private fun evaluationSnapshot(command: ExecuteDecisionCommand): Map<String, Any?> =
+        command.transactionSnapshot.ifEmpty {
+            mapOf(
+                "sourceSystem" to command.sourceSystem,
+                "externalTransactionId" to command.transactionId.value,
+                "customerId" to command.customerId.value,
+                "detectionMatched" to command.detectionResult.matched,
+                "matches" to command.detectionResult.matches.map { match ->
+                    mapOf("term" to match.term, "category" to match.category)
+                },
+            )
+        }
 
     /**
      * Persiste DecisionExecution com retry (3 tentativas) para falhas de DataAccessException.
@@ -212,7 +353,14 @@ class DecisionService(
             transactionId = command.transactionId,
             customerId = command.customerId,
             ruleCode = command.ruleCode,
-            detectionResult = command.detectionResult
+            detectionResult = command.detectionResult,
+            inputEventId = command.inputEventId,
+            inputEventSchemaVersion = command.inputEventSchemaVersion,
+            transactionVersion = command.transactionVersion,
+            purpose = command.purpose,
+            sourceSystem = command.sourceSystem,
+            transactionSnapshot = command.transactionSnapshot,
+            evaluationRequestId = command.evaluationRequestId,
         )
     }
 
@@ -251,4 +399,5 @@ class DecisionService(
     private fun isTypedPartyId(value: String): Boolean = PARTY_ID_REGEX.matches(value)
 
     private val PARTY_ID_REGEX = Regex("^pty_[0-9A-HJKMNP-TV-Z]{26}$")
+    private val INPUT_EVENT_ID_REGEX = Regex("^[0-9A-HJKMNP-TV-Z]{26}$")
 }

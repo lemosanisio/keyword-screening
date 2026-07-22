@@ -7,6 +7,9 @@ import br.com.decision.domain.model.DecisionExplanation
 import br.com.decision.domain.model.DecisionResult
 import br.com.decision.domain.model.DecisionStep
 import br.com.decision.domain.model.EvaluationStep
+import br.com.decision.domain.model.EvaluationStatus
+import br.com.decision.domain.model.EvaluationOutcome
+import br.com.decision.domain.model.RecommendedRoute
 import br.com.decision.domain.model.PersistenceStep
 import br.com.decision.domain.model.PublicationStep
 import br.com.decision.domain.model.ReceptionStep
@@ -110,10 +113,14 @@ class DecisionEngine(
         val actions: List<Action>
         val justification: String
 
-        if (ruleEvaluationResult.allSatisfied) {
+        if (ruleEvaluationResult.outcome == RuleEvaluationOutcome.TRUE) {
             decision = Decision.ALERT
             actions = configuration.actions
             justification = "Todas as condições satisfeitas — ação(ões): ${actions.joinToString()}"
+        } else if (ruleEvaluationResult.outcome == RuleEvaluationOutcome.INDETERMINATE) {
+            decision = Decision.IGNORE
+            actions = emptyList()
+            justification = "Avaliação indeterminada por fatos não presentes — revisão humana requerida"
         } else {
             decision = Decision.IGNORE
             actions = emptyList()
@@ -157,8 +164,9 @@ class DecisionEngine(
         )
 
         // Partition evaluations into matched/failed
-        val matchedExpressions = ruleEvaluationResult.evaluations.filter { it.satisfied }
-        val failedExpressions = ruleEvaluationResult.evaluations.filter { !it.satisfied }
+        val matchedExpressions = ruleEvaluationResult.evaluations.filter { it.outcome == br.com.decision.domain.model.ExpressionOutcome.TRUE }
+        val failedExpressions = ruleEvaluationResult.evaluations.filter { it.outcome != br.com.decision.domain.model.ExpressionOutcome.TRUE }
+        val indeterminate = ruleEvaluationResult.outcome == RuleEvaluationOutcome.INDETERMINATE
 
         return DecisionResult(
             decision = decision,
@@ -168,7 +176,16 @@ class DecisionEngine(
             executionTimeMs = executionTimeMs,
             configurationVersion = configuration.currentVersion,
             facts = factSet.facts,
-            explanation = explanation
+            explanation = explanation,
+            factResults = factSet.factResults,
+            evaluationStatus = if (indeterminate) EvaluationStatus.INDETERMINATE else EvaluationStatus.COMPLETED,
+            evaluationOutcome = if (Action.GENERATE_ALERT in actions) EvaluationOutcome.SIGNAL_RAISED else EvaluationOutcome.NO_SIGNAL,
+            reviewRequired = indeterminate || Action.REVIEW in actions,
+            recommendedRoute = if (indeterminate || Action.REVIEW in actions) {
+                RecommendedRoute.DERIVED_TO_ANALYST
+            } else {
+                null
+            },
         )
     }
 

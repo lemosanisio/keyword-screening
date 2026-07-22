@@ -34,7 +34,7 @@ class TransactionSignalConsumerIntegrationTest {
     @BeforeEach
     fun cleanDatabase() {
         jdbcTemplate.execute(
-            "truncate table case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
+            "truncate table manual_review_request, transaction_signal_projection, transaction_evaluation_projection, case_source, pld_case, inbox_event, outbox_event, timeline_entry, analysis_cycle, party_snapshot, party restart identity cascade",
         )
     }
 
@@ -62,6 +62,8 @@ class TransactionSignalConsumerIntegrationTest {
             TimelineRow("CASE_CREATED", "Case", caseId()),
         )
         assertThat(inboxStatuses()).containsExactly("PROCESSED")
+        assertThat(jdbcTemplate.queryForObject("select count(*) from transaction_signal_projection", Long::class.java))
+            .isEqualTo(1)
     }
 
     @Test

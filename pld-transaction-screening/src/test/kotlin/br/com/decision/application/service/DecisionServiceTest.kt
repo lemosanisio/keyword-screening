@@ -49,6 +49,11 @@ import br.com.shared.domain.valueobject.CustomerId
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
+import br.com.evaluation.infrastructure.CanonicalSnapshot
+import br.com.evaluation.infrastructure.SnapshotCanonicalizer
+import br.com.evaluation.infrastructure.TransactionEvaluationRepository
+import br.com.evaluation.infrastructure.TransactionIdentityResolver
+import br.com.evaluation.infrastructure.TransactionEvaluationLock
 
 @DisplayName("DecisionService — Unit Tests")
 class DecisionServiceTest {
@@ -58,13 +63,27 @@ class DecisionServiceTest {
     private val ruleDefinitionRepository = mockk<RuleDefinitionRepository>()
     private val ruleConfigurationRepository = mockk<RuleConfigurationRepository>()
     private val domainEventPublisher = mockk<DomainEventPublisher>()
+    private val transactionIdentityResolver = mockk<TransactionIdentityResolver>()
+    private val snapshotCanonicalizer = mockk<SnapshotCanonicalizer>()
+    private val transactionEvaluationRepository = mockk<TransactionEvaluationRepository>(relaxed = true)
+    private val transactionEvaluationLock = mockk<TransactionEvaluationLock>(relaxed = true)
+
+    init {
+        every { transactionIdentityResolver.resolve(any(), any()) } answers { secondArg() }
+        every { snapshotCanonicalizer.canonicalize(any()) } returns CanonicalSnapshot("{}", "0".repeat(64))
+        every { transactionEvaluationRepository.findDecisionExecutionId(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns null
+    }
 
     private val decisionService = DecisionService(
         decisionEngine = decisionEngine,
         decisionExecutionRepository = decisionExecutionRepository,
         ruleDefinitionRepository = ruleDefinitionRepository,
         ruleConfigurationRepository = ruleConfigurationRepository,
-        domainEventPublisher = domainEventPublisher
+        domainEventPublisher = domainEventPublisher,
+        transactionIdentityResolver = transactionIdentityResolver,
+        snapshotCanonicalizer = snapshotCanonicalizer,
+        transactionEvaluationRepository = transactionEvaluationRepository,
+        transactionEvaluationLock = transactionEvaluationLock,
     )
 
     private val ruleId = RuleId(UUID.randomUUID())
@@ -224,6 +243,7 @@ class DecisionServiceTest {
             } returns null
             every { ruleConfigurationRepository.findActiveByRuleId(ruleId) } returns null
             every { decisionExecutionRepository.save(any()) } answers { firstArg() }
+            every { domainEventPublisher.publish(any()) } just Runs
 
             val command = buildCommand()
             val result = decisionService.execute(command)
@@ -235,8 +255,8 @@ class DecisionServiceTest {
             verify(exactly = 1) { decisionExecutionRepository.save(any()) }
             // Should NOT invoke DecisionEngine
             verify(exactly = 0) { decisionEngine.evaluate(any(), any(), any()) }
-            // Should NOT publish event
-            verify(exactly = 0) { domainEventPublisher.publish(any()) }
+            // Completion is published even when no configuration can raise a signal.
+            verify(exactly = 1) { domainEventPublisher.publish(any()) }
         }
     }
 
@@ -402,6 +422,7 @@ class DecisionServiceTest {
             every { decisionExecutionRepository.save(any()) } throws
                 QueryTimeoutException("timeout") andThenThrows
                 QueryTimeoutException("timeout") andThen { it.invocation.args[0] as DecisionExecution }
+            every { domainEventPublisher.publish(any()) } just Runs
 
             val command = buildCommand()
             val result = decisionService.execute(command)

@@ -14,6 +14,7 @@ import br.com.shared.domain.valueobject.CustomerId
 import br.com.shared.domain.valueobject.EventId
 import br.com.shared.domain.valueobject.TraceId
 import br.com.shared.domain.valueobject.TransactionId
+import br.com.evaluation.domain.TransactionEvaluation
 import java.time.Instant
 
 /**
@@ -39,4 +40,5 @@ data class DecisionMadeEvent(
     val evaluationId: String? = null,
     val correlationId: String? = null,
     val causationId: String? = null,
+    val evaluation: TransactionEvaluation? = null,
 ) : DomainEvent

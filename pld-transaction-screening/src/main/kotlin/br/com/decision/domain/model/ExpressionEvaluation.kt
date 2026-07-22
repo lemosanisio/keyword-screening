@@ -10,5 +10,6 @@ data class ExpressionEvaluation(
     val expectedValue: FactValue,
     val actualValue: FactValue?,
     val satisfied: Boolean,
-    val justification: String
+    val justification: String,
+    val outcome: ExpressionOutcome = if (satisfied) ExpressionOutcome.TRUE else ExpressionOutcome.FALSE,
 )
